@@ -1,0 +1,164 @@
+#!/usr/bin/env python
+
+"""9anime.to Service Code"""
+
+from urllib import urlencode
+
+RE_NORM = Regex(r'(https?://(?:www\.)?\w+\.\w+)/watch/[^/]+/(\w+)')
+RE_DUR = Regex(r'(\d+) *?(h|min|sec)')
+FALLBACK = 'http://i.imgur.com/75YO83o.jpg'
+
+####################################################################################################
+def NormalizeURL(url):
+
+    return url.split('?')[0]
+
+####################################################################################################
+def MetadataObjectForURL(url):
+
+    page = get_page(url)
+    html = HTML.ElementFromString(page)
+
+    ep_num = html.xpath('//a[@class="active"]/@data-base')
+    ep_num = ep_num[0] if ep_num else None
+
+    show_name = html.xpath('//h1[@class="title"]/text()')
+    show_name = show_name[0].strip() if show_name else None
+    show_name = show_name if (show_name.endswith('(Dub)') or show_name.endswith('(DUB)')) else show_name + ' (Sub)'
+
+    if (ep_num is None) and (show_name is None):
+        raise Ex.MediaExpired
+
+    art = html.xpath('//meta[@property="og:image"]/@content')
+    art = art[0] if art else None
+
+    thumb = html.xpath('//img[@itemprop="image"]/@src')
+    thumb = thumb[0].split('url=')[1] if thumb else FALLBACK
+
+    kind = html.xpath('//dt[text()="Type:"]/following-sibling::dd/text()')
+    kind = kind[0] if kind else None
+
+    oaa = html.xpath('//dd[@itemprop="dateCreated"]/text()')
+    oaa = oaa[0].split(' to ')[0].strip() if oaa else None
+    try:
+        oaa = Datetime.ParseDate(oaa)
+    except:
+        oaa = None
+
+    score = html.xpath('//dt[text()="Scores:"]/following-sibling::dd/text()')
+    score = float(score[0].split(' / ')[0].strip()) if score else None
+
+    dur = html.xpath('//dt[text()="Duration:"]/following-sibling::dd/text()')
+    dur = dur[0].split('/')[0].strip() if dur else None
+    try:
+        duration = Datetime.MillisecondsFromString(dur)
+    except:
+        try:
+            duration = 0
+            for i, s in RE_DUR.findall(dur):
+                if s == 'h':
+                    duration += int(i)*60*60*1000
+                elif s == 'min':
+                    duration += int(i)*60*1000
+                elif s == 'sec':
+                    duration += int(i)*1000
+        except:
+            duration = None
+
+    des = html.xpath('//div[@itemprop="description"]/text()')
+    summary = des[0].strip() if des else None
+
+    tags = html.xpath('//div[@id="tags"]/a/text()')
+    genres = html.xpath('//dt[text()="Genre:"]/following-sibling::dd/a/text()')
+
+
+    if kind and 'movie' in kind.lower():
+        return MovieObject(
+            title=show_name,
+            rating=score,
+            originally_available_at=oaa,
+            year=int(oaa.year) if oaa else None,
+            duration=duration,
+            tags=tags if tags else [],
+            genres=genres if genres else [],
+            thumb=Resource.ContentsOfURLWithFallback([thumb, FALLBACK]),
+            art=art,
+            summary=summary,
+            source_title='9anime'
+            )
+
+    elif kind:
+        season = 1 if 'tv' in kind.lower() else 0
+    else:
+        season = 0
+
+    return EpisodeObject(
+        title='Episode ' + ep_num,
+        show=show_name,
+        season=season,
+        index=int(ep_num),
+        rating=score,
+        duration=duration,
+        tags=tags if tags else [],
+        thumb=Resource.ContentsOfURLWithFallback([thumb, FALLBACK]),
+        art=art,
+        summary=summary,
+        source_title='9anime'
+        )
+
+####################################################################################################
+def MediaObjectsForURL(url):
+
+    return [
+        MediaObject(
+            video_resolution=res,
+            container=Container.MP4,
+            video_codec=VideoCodec.H264,
+            audio_codec=AudioCodec.AAC,
+            audio_channels=2,
+            optimized_for_streaming=True,
+            parts=[
+                PartObject(key=Callback(PlayVideo, url=url, res=res))
+                ],
+            ) for res in ('1080', '720', '480', '360')
+        ]
+
+####################################################################################################
+@indirect
+def PlayVideo(url, res='720', **kwargs):
+    r = RE_NORM.search(url)
+    if not r:
+        raise Ex.MediaNotAvailable
+
+    base_url = r.group(1)
+    vid = r.group(2)
+    data_url = base_url + '/ajax/episode/info?id=' + vid
+
+    data = JSON.ObjectFromString(get_page(data_url))
+    grabber = data['grabber'] + '?' + urlencode(data['params'])
+
+    streams = JSON.ObjectFromString(get_page(grabber))
+
+    vurls = [{'label': int(s['label'][:-1]), 'file': s['file']} for s in streams['data'] if s['type'] == 'mp4']
+    vurl = None
+    for s in Util.ListSortedByKey(vurls, 'label'):
+        vurl = s['file']
+        q = s['label']
+        if s['label'] == int(res):
+            break
+        elif s['label'] > int(res):
+            break
+
+    if vurl:
+        Log.Debug('* PlayVideo URL = {} | {}'.format(q, vurl))
+        return IndirectResponse(VideoClipObject, key=vurl)
+
+    raise Ex.MediaNotAvailable
+
+####################################################################################################
+def get_page(url):
+    try:
+        return HTTP.Request(url, cacheTime=10).content
+    except:
+        Log.Exception(u"* Error: Cannot open '{0}' >>>".format(url))
+    raise Ex.MediaNotAvailable
