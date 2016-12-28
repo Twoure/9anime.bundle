@@ -34,8 +34,14 @@ This plugin creates a new Video Channel within [Plex Media Server](https://plex.
   - Unzip and rename the folder to **9anime.bundle**
   - Copy **9anime.bundle** into the PMS [Plug-ins](https://support.plex.tv/hc/en-us/articles/201106098-How-do-I-find-the-Plug-Ins-folder-) directory
   - Unix based platforms need to `chown plex:plex -R 9anime.bundle` after moving it into the [Plug-ins](https://support.plex.tv/hc/en-us/articles/201106098-How-do-I-find-the-Plug-Ins-folder-) directory _(`user:group` may differ by platform)_
+  - **Restart PMS**
+
+## To Do
+
+- Switch to `TVShow` and `Season` objects
+- Add bookmark support
 
 ## Support
 
-- ~~[Plex Forums Thread](https://forums.plex.tv/discussion/)~~ _(coming soon)_
+- [Plex Forums Thread](https://forums.plex.tv/discussion/251439)
 - [GitHub Issues](https://github.com/Twoure/9anime.bundle/issues)
