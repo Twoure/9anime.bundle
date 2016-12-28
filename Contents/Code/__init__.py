@@ -49,7 +49,7 @@ def Start():
     InputDirectoryObject.art = R(MAIN_ART)
 
     #HTTP.CacheTime = 0  # 0sec for testing
-    HTTP.CacheTime = 1HOUR_CACHE  # 1hr cache for release
+    HTTP.CacheTime = CACHE_1HOUR  # 1hr cache for release
     version = get_channel_version()
 
     Log.Debug('*' * 80)
