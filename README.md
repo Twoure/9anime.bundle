@@ -1,7 +1,7 @@
 9anime
 ===========
 
-[![GitHub issues](https://img.shields.io/github/issues/Twoure/9anime.bundle.svg?style=flat)](https://github.com/Twoure/9anime.bundle/issues) [![](https://img.shields.io/github/release/Twoure/9anime.bundle.svg?style=flat)](https://github.com/Twoure/9anime.bundle/releases)
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/87e4130322374e9e900fcc763a27eb4e)](https://www.codacy.com/app/twoure/9anime-bundle?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=Twoure/9anime.bundle&amp;utm_campaign=Badge_Grade) [![GitHub issues](https://img.shields.io/github/issues/Twoure/9anime.bundle.svg?style=flat)](https://github.com/Twoure/9anime.bundle/issues) [![](https://img.shields.io/github/release/Twoure/9anime.bundle.svg?style=flat)](https://github.com/Twoure/9anime.bundle/releases)
 
 This plugin creates a new Video Channel within [Plex Media Server](https://plex.tv/) (PMS) to view [Anime](https://en.wikipedia.org/wiki/Anime) from [9anime.to](http://9anime.to/).  It is currently under development and as such, should be considered alpha software and potentially unstable.
 
@@ -29,7 +29,7 @@ This plugin creates a new Video Channel within [Plex Media Server](https://plex.
 
 ## Install
 
-- ~~This channel can be installed via [WebTools.bundle](https://github.com/dagalufh/WebTools.bundle) or manually follow the directions below.~~ _(coming soon)_
+- This channel can be installed via [WebTools.bundle](https://github.com/dagalufh/WebTools.bundle) or manually follow the directions below.
 - Download the latest [![](https://img.shields.io/github/release/Twoure/9anime.bundle.svg?style=flat)](https://github.com/Twoure/9anime.bundle/releases) and install **9anime** by following the Plex [instructions](https://support.plex.tv/hc/en-us/articles/201187656-How-do-I-manually-install-a-channel-) or the instructions below.
   - Unzip and rename the folder to **9anime.bundle**
   - Copy **9anime.bundle** into the PMS [Plug-ins](https://support.plex.tv/hc/en-us/articles/201106098-How-do-I-find-the-Plug-Ins-folder-) directory

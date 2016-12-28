@@ -13,11 +13,9 @@ BASE_URL                    = Common.BASE_URL
 GIT_REPO                    = 'Twoure/{}.bundle'.format(TITLE)
 
 # setup Updater and inital run info
-"""
 from pluginupdateservice import PluginUpdateService
 Updater = PluginUpdateService()
-Updater.initial_run:
-"""
+Updater.initial_run
 
 # more global variables
 MAIN_MENUS = {
@@ -50,8 +48,8 @@ def Start():
 
     InputDirectoryObject.art = R(MAIN_ART)
 
-    #HTTP.CacheTime = 0  # 0sec for testing
-    HTTP.CacheTime = 1HOUR_CACHE  # 1hr cache for release
+    HTTP.CacheTime = 0  # 0sec for testing
+    #HTTP.CacheTime = 1HOUR_CACHE  # 1hr cache for release
     version = get_channel_version()
 
     Log.Debug('*' * 80)
@@ -93,7 +91,6 @@ def MainMenu():
         prefs_thumb = R(PREFS_ICON)
         search_thumb = R(SEARCH_ICON)
 
-    """
     if Prefs['update_channel'] == 'Stable':
         # Setup Updater to track latest release
         Updater.gui_update(
@@ -106,20 +103,20 @@ def MainMenu():
             PREFIX + '/updater', oc, GIT_REPO,
             branch='dev', list_view_clients=Common.LIST_VIEW_CLIENTS
             )
-    """
 
+    # setup basic main menus
     for (t, h) in MAIN_MENUS.items():
         oc.add(DirectoryObject(
             key=Callback(SubMenu, title=t, href=h), title=t,
             ))
 
-    """
+    # setup prefs button
     if Client.Product in DumbPrefs.clients:
         DumbPrefs(PREFIX, oc, title='Preferences', thumb=prefs_thumb)
-    elif admin:
+    else:
         oc.add(PrefsObject(title='Preferences', thumb=prefs_thumb))
 
-    """
+    # setup search function
     if Client.Product in DumbKeyboard.clients:
         DumbKeyboard(PREFIX, oc, Search, dktitle='Search', dkthumb=R(SEARCH_ICON))
     else:
