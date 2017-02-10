@@ -5,6 +5,7 @@
 ####################################################################################################
 import common as Common
 from DumbTools import DumbKeyboard, DumbPrefs
+HTTPS = SharedCodeService.https_fix
 
 # setup global variables
 TITLE                       = Common.TITLE
@@ -136,7 +137,10 @@ def ValidatePrefs():
 def SubMenu(title, href):
     oc = ObjectContainer(title2=title)
 
-    html = HTML.ElementFromURL(BASE_URL + href)
+    if Prefs['ssl_fix']:
+        html = HTTPS.ElementFromURL(BASE_URL + href)
+    else:
+        html = HTML.ElementFromURL(BASE_URL + href)
 
     for ci in html.xpath('//div[@class="item"]'):
         img_node = ci.xpath('.//img')[0]
@@ -159,9 +163,14 @@ def SubMenu(title, href):
 
     if nhref:
         nhref = nhref if nhref.startswith('/') else '/'+nhref
+        page = nhref.split('page=')[1]
+        if Regex(r'P(\d+)$').search(title):
+            title = Regex(r'P(\d+)$').sub('P' + page, title)
+        else:
+            title = title + ' P' + page
         oc.add(NextPageObject(
-            key=Callback(SubMenu, title=title+' P'+nhref.split('page=')[1], href=nhref),
-            title='Next Page>>', thumb=R(NEXT_ICON)
+            key=Callback(SubMenu, title=title, href=nhref),
+            title='Next Page {}>>'.format(int(page)), thumb=R(NEXT_ICON)
             ))
 
     if len(oc) == 0:
@@ -178,7 +187,10 @@ def SubMenu(title, href):
 def ShowMenu(title, thumb, url):
     oc = ObjectContainer(title2=title)
 
-    html = HTML.ElementFromURL(url)
+    if Prefs['ssl_fix']:
+        html = HTTPS.ElementFromURL(url)
+    else:
+        html = HTML.ElementFromURL(url)
 
     dt = [d.strip() for d in html.xpath('//dt[text()="Type:"]/following-sibling::dd/text()') if (d.strip() != ',') and (d.strip() != '')]
     kind = dt[0] if dt else None

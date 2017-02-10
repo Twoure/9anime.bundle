@@ -3,6 +3,7 @@
 """9anime.to Service Code"""
 
 from urllib import urlencode
+import https_fix as HTTPS
 
 RE_NORM = Regex(r'(https?://(?:www\.)?\w+\.\w+)/watch/[^/]+/(\w+)')
 RE_DUR = Regex(r'(\d+) *?(h|min|sec)')
@@ -32,13 +33,13 @@ def MetadataObjectForURL(url):
     art = html.xpath('//meta[@property="og:image"]/@content')
     art = art[0] if art else None
 
-    thumb = html.xpath('//img[@itemprop="image"]/@src')
+    thumb = html.xpath('//div/img/@src')
     thumb = thumb[0].split('url=')[1] if thumb else FALLBACK
 
     kind = html.xpath('//dt[text()="Type:"]/following-sibling::dd/text()')
     kind = kind[0] if kind else None
 
-    oaa = html.xpath('//dd[@itemprop="dateCreated"]/text()')
+    oaa = html.xpath('//dt[text()="Date aired:"]/following-sibling::dd/text()')
     oaa = oaa[0].split(' to ')[0].strip() if oaa else None
     try:
         oaa = Datetime.ParseDate(oaa)
@@ -65,7 +66,7 @@ def MetadataObjectForURL(url):
         except:
             duration = None
 
-    des = html.xpath('//div[@itemprop="description"]/text()')
+    des = html.xpath('//div[@class="desc"]/text()')
     summary = des[0].strip() if des else None
 
     tags = html.xpath('//div[@id="tags"]/a/text()')
@@ -98,6 +99,7 @@ def MetadataObjectForURL(url):
         season=season,
         index=int(ep_num),
         rating=score,
+        originally_available_at=oaa,
         duration=duration,
         tags=tags if tags else [],
         thumb=Resource.ContentsOfURLWithFallback([thumb, FALLBACK]),
@@ -135,11 +137,12 @@ def PlayVideo(url, res='720', **kwargs):
     data_url = base_url + '/ajax/episode/info?id=' + vid
 
     data = JSON.ObjectFromString(get_page(data_url))
-    grabber = data['grabber'] + '?' + urlencode(data['params'])
+    grabber = clean_url(data['grabber'] + '?' + urlencode(data['params']))
 
     streams = JSON.ObjectFromString(get_page(grabber))
 
     vurls = [{'label': int(s['label'][:-1]), 'file': s['file']} for s in streams['data'] if s['type'] == 'mp4']
+    Log(vurls)
     vurl = None
     for s in Util.ListSortedByKey(vurls, 'label'):
         vurl = s['file']
@@ -156,8 +159,18 @@ def PlayVideo(url, res='720', **kwargs):
     raise Ex.MediaNotAvailable
 
 ####################################################################################################
+def clean_url(url):
+    if url.startswith('//'):
+        url = 'https:' + url
+    elif url.startswith('/'):
+        url = 'https://9anime.to' + url
+    return url
+
+####################################################################################################
 def get_page(url):
     try:
+        if Prefs['ssl_fix']:
+            return HTTPS.Request(url)
         return HTTP.Request(url, cacheTime=10).content
     except:
         Log.Exception(u"* Error: Cannot open '{0}' >>>".format(url))

@@ -5,7 +5,7 @@
 # general constants
 TITLE = '9anime'
 PREFIX = '/video/' + TITLE
-BASE_URL = 'http://{}.to'.format(TITLE)
+BASE_URL = 'https://{}.to'.format(TITLE)
 LIST_VIEW_CLIENTS = ['Android', 'iOS']
 
 ####################################################################################################
