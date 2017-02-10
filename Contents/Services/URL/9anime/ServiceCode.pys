@@ -99,7 +99,7 @@ def MetadataObjectForURL(url):
         season=season,
         index=int(ep_num),
         rating=score,
-        originally_available_at=oaa,
+        #originally_available_at=oaa,  #no oaa per ep :( only for start/end of seasons
         duration=duration,
         tags=tags if tags else [],
         thumb=Resource.ContentsOfURLWithFallback([thumb, FALLBACK]),
@@ -142,7 +142,7 @@ def PlayVideo(url, res='720', **kwargs):
     streams = JSON.ObjectFromString(get_page(grabber))
 
     vurls = [{'label': int(s['label'][:-1]), 'file': s['file']} for s in streams['data'] if s['type'] == 'mp4']
-    Log(vurls)
+    Log.Debug("* 9anime Video Sources: {}".format(vurls))
     vurl = None
     for s in Util.ListSortedByKey(vurls, 'label'):
         vurl = s['file']
