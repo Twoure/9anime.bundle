@@ -25,12 +25,12 @@ def Request(url, close=True, redirect=True, followredirect=False, error=False, p
         handlers = []
         redirectURL = url
 
-        if not proxy == None:
+        if (proxy != None):
             handlers += [urllib2.ProxyHandler({'http':'%s' % (proxy)}), urllib2.HTTPHandler]
             opener = urllib2.build_opener(*handlers)
             opener = urllib2.install_opener(opener)
 
-        if output == 'cookie2' or output == 'cookie' or output == 'extended' or not close == True:
+        if (output == 'cookie2') or (output == 'cookie') or (output == 'extended') or (close != True):
             cookies = cookielib.LWPCookieJar()
             if httpsskip:
                 handlers += [urllib2.HTTPHandler(), urllib2.HTTPCookieProcessor(cookies)]
@@ -40,14 +40,19 @@ def Request(url, close=True, redirect=True, followredirect=False, error=False, p
             opener = urllib2.install_opener(opener)
 
         try:
-            if sys.version_info < (2, 7, 9): raise Exception()
-            import ssl; ssl_context = ssl.create_default_context()
+            if sys.version_info < (2, 7, 9):
+                version = '.'.join([str(i) for i in list(sys.version_info)[:3]])
+                Log.Error(u"* <HTTPS.Request> Error: Bundle Python v{} is too Old.".format(version))
+                raise Exception()
+            import ssl
+            ssl_context = ssl.create_default_context()
             ssl_context.check_hostname = False
             ssl_context.verify_mode = ssl.CERT_NONE
             handlers += [urllib2.HTTPSHandler(context=ssl_context)]
             opener = urllib2.build_opener(*handlers)
             opener = urllib2.install_opener(opener)
         except:
+            Log.Exception(u"* <HTTPS.Request> Error: >>>")
             pass
 
         try:
@@ -70,7 +75,7 @@ def Request(url, close=True, redirect=True, followredirect=False, error=False, p
         if cookie and ('Cookie' not in headers):
             headers['Cookie'] = cookie
 
-        if redirect == False:
+        if (redirect == False):
             class NoRedirection(urllib2.HTTPErrorProcessor):
                 def http_response(self, request, response):
                     return response
@@ -111,17 +116,7 @@ def Request(url, close=True, redirect=True, followredirect=False, error=False, p
                     redirectURL = redURL
 
         except urllib2.HTTPError as response:
-            if response.code == 503:
-                if 'cf-browser-verification' in response.read(5242880):
-                    netloc = '%s://%s' % (urlparse.urlparse(url).scheme, urlparse.urlparse(url).netloc)
-                    cf = cfcookie(netloc, headers['User-Agent'], timeout)
-
-                    headers['Cookie'] = cf
-                    request = urllib2.Request(url, data=post, headers=headers)
-                    response = urllib2.urlopen(request, timeout=int(timeout))
-                elif error == False:
-                    return
-            elif response.code == 307:
+            if (response.code == 307):
                 cookie = ''
                 try:
                     cookie = '; '.join(['%s=%s' % (i.name, i.value) for i in cookies])
@@ -131,7 +126,7 @@ def Request(url, close=True, redirect=True, followredirect=False, error=False, p
                 request = urllib2.Request(response.headers['Location'], data=post, headers=headers)
                 response = urllib2.urlopen(request, timeout=int(timeout))
 
-            elif error == False:
+            elif (error == False):
                 Log.Error("Response code",response.code, response.msg,url)
                 return
 
@@ -148,7 +143,7 @@ def Request(url, close=True, redirect=True, followredirect=False, error=False, p
         elif output == 'response':
             if limit == '0':
                 result = (str(response.code), response.read(224 * 1024))
-            elif not limit == None:
+            elif (limit != None):
                 result = (str(response.code), response.read(int(limit) * 1024))
             else:
                 result = (str(response.code), response.read(5242880))
@@ -167,7 +162,7 @@ def Request(url, close=True, redirect=True, followredirect=False, error=False, p
             if content < (2048 * 1024):
                 return
             result = response.read(16 * 1024)
-            if close == True:
+            if (close == True):
                 response.close()
             return result
 
@@ -199,93 +194,35 @@ def Request(url, close=True, redirect=True, followredirect=False, error=False, p
             else:
                 result = response.read(5242880)
 
-        if close == True:
+        if (close == True):
             response.close()
 
         return result
-    except Exception as e:
-        Log('ERROR fmovies.py>request %s, %s:' % (e.args,url))
-        return
-
-####################################################################################################
-def cfcookie(netloc, ua, timeout):
-    try:
-        headers = {'User-Agent': ua}
-
-        request = urllib2.Request(netloc, headers=headers)
-
-        try:
-            response = urllib2.urlopen(request, timeout=int(timeout))
-        except urllib2.HTTPError as response:
-            result = response.read(5242880)
-
-        jschl = Regex('name="jschl_vc" value="(.+?)"/>').findall(result)[0]
-
-        init = Regex('setTimeout\(function\(\){\s*.*?.*:(.*?)};').findall(result)[-1]
-
-        builder = Regex(r"challenge-form\'\);\s*(.*)a.v").findall(result)[0]
-
-        decryptVal = parseJSString(init)
-
-        lines = builder.split(';')
-
-        for line in lines:
-
-            if len(line) > 0 and '=' in line:
-
-                sections=line.split('=')
-                line_val = parseJSString(sections[1])
-                decryptVal = int(eval(str(decryptVal)+sections[0][-1]+str(line_val)))
-
-        answer = decryptVal + len(urlparse.urlparse(netloc).netloc)
-
-        query = '%s/cdn-cgi/l/chk_jschl?jschl_vc=%s&jschl_answer=%s' % (netloc, jschl, answer)
-
-        if 'type="hidden" name="pass"' in result:
-            passval = Regex('name="pass" value="(.*?)"').findall(result)[0]
-            query = '%s/cdn-cgi/l/chk_jschl?pass=%s&jschl_vc=%s&jschl_answer=%s' % (netloc, String.Quote(passval, True), jschl, answer)
-            Thread.Sleep(5)
-
-        cookies = cookielib.LWPCookieJar()
-        handlers = [urllib2.HTTPHandler(), urllib2.HTTPSHandler(), urllib2.HTTPCookieProcessor(cookies)]
-        opener = urllib2.build_opener(*handlers)
-        opener = urllib2.install_opener(opener)
-
-        try:
-            request = urllib2.Request(query, headers=headers)
-            response = urllib2.urlopen(request, timeout=int(timeout))
-        except:
-            pass
-
-        cookie = '; '.join(['%s=%s' % (i.name, i.value) for i in cookies])
-
-        return cookie
-    except Exception as e:
-        Log('Client ERR: %s' % (e))
-        return
-
-####################################################################################################
-def parseJSString(s):
-    try:
-        offset=1 if s[0]=='+' else 0
-        val = int(eval(s.replace('!+[]','1').replace('!![]','1').replace('[]','0').replace('(','str(')[offset:]))
-        return val
     except:
-        pass
+        Log.Exception(u"* <HTTPS.Request> Error: Cannot handle {} >>>".format(url))
+    return
 
 ####################################################################################################
 def randomagent():
     br_vers = [
         ['%s.0' % i for i in xrange(18, 43)],
-        ['37.0.2062.103', '37.0.2062.120', '37.0.2062.124', '38.0.2125.101', '38.0.2125.104', '38.0.2125.111', '39.0.2171.71', '39.0.2171.95', '39.0.2171.99', '40.0.2214.93', '40.0.2214.111',
-         '40.0.2214.115', '42.0.2311.90', '42.0.2311.135', '42.0.2311.152', '43.0.2357.81', '43.0.2357.124', '44.0.2403.155', '44.0.2403.157', '45.0.2454.101', '45.0.2454.85', '46.0.2490.71',
-         '46.0.2490.80', '46.0.2490.86', '47.0.2526.73', '47.0.2526.80'],
-        ['11.0']]
-    win_vers = ['Windows NT 10.0', 'Windows NT 7.0', 'Windows NT 6.3', 'Windows NT 6.2', 'Windows NT 6.1', 'Windows NT 6.0', 'Windows NT 5.1', 'Windows NT 5.0']
+        ['37.0.2062.103', '37.0.2062.120', '37.0.2062.124', '38.0.2125.101', '38.0.2125.104',
+            '38.0.2125.111', '39.0.2171.71', '39.0.2171.95', '39.0.2171.99', '40.0.2214.93',
+            '40.0.2214.111', '40.0.2214.115', '42.0.2311.90', '42.0.2311.135', '42.0.2311.152',
+            '43.0.2357.81', '43.0.2357.124', '44.0.2403.155', '44.0.2403.157', '45.0.2454.101',
+            '45.0.2454.85', '46.0.2490.71', '46.0.2490.80', '46.0.2490.86', '47.0.2526.73',
+            '47.0.2526.80'], ['11.0']
+        ]
+    win_vers = [
+        'Windows NT 10.0', 'Windows NT 7.0', 'Windows NT 6.3', 'Windows NT 6.2',
+        'Windows NT 6.1', 'Windows NT 6.0', 'Windows NT 5.1', 'Windows NT 5.0'
+        ]
     features = ['; WOW64', '; Win64; IA64', '; Win64; x64', '']
-    rand_uas = ['Mozilla/5.0 ({win_ver}{feature}; rv:{br_ver}) Gecko/20100101 Firefox/{br_ver}',
-                'Mozilla/5.0 ({win_ver}{feature}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{br_ver} Safari/537.36',
-                'Mozilla/5.0 ({win_ver}{feature}; Trident/7.0; rv:{br_ver}) like Gecko']
+    rand_uas = [
+        'Mozilla/5.0 ({win_ver}{feature}; rv:{br_ver}) Gecko/20100101 Firefox/{br_ver}',
+        'Mozilla/5.0 ({win_ver}{feature}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{br_ver} Safari/537.36',
+        'Mozilla/5.0 ({win_ver}{feature}; Trident/7.0; rv:{br_ver}) like Gecko'
+        ]
     b = Util.RandomItemFromList(br_vers)
     w = Util.RandomItemFromList(win_vers)
     f = Util.RandomItemFromList(features)
