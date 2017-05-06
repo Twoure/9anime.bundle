@@ -3,9 +3,9 @@
 #                                   9anime Plex Channel                                            #
 #                                                                                                  #
 ####################################################################################################
-import common as Common
+Common = SharedCodeService.common
+Network = SharedCodeService.network.Network
 from DumbTools import DumbKeyboard, DumbPrefs
-HTTPS = SharedCodeService.https_fix
 
 # setup global variables
 TITLE                       = Common.TITLE
@@ -49,8 +49,7 @@ def Start():
 
     InputDirectoryObject.art = R(MAIN_ART)
 
-    #HTTP.CacheTime = 0  # 0sec for testing
-    HTTP.CacheTime = CACHE_1HOUR  # 1hr cache for release
+    HTTP.CacheTime = int(Common.CACHE_TIME.total_seconds())  # 1hr cache for release
     version = get_channel_version()
 
     Log.Debug('*' * 80)
@@ -137,17 +136,19 @@ def ValidatePrefs():
 def SubMenu(title, href):
     oc = ObjectContainer(title2=title)
 
-    if Prefs['ssl_fix']:
-        html = HTTPS.ElementFromURL(BASE_URL + href)
-    else:
-        html = HTML.ElementFromURL(BASE_URL + href)
+    headers = {'Referer': BASE_URL, 'User-Agent': Common.USER_AGENT}
+    if 'search?' in href:
+        headers.update({'Cookie': Network.get_cookies()})
+    html = Network.ElementFromURL(BASE_URL + href, headers=headers)
 
     for ci in html.xpath('//div[@class="item"]'):
         img_node = ci.xpath('.//img')[0]
         stitle = img_node.get('alt').strip()
         if not stitle:
             stitle = ci.xpath('.//a[@class="name"]/text()')[0]
-        thumb = img_node.get('src').split('url=')[1]
+        thumb = img_node.get('src')
+        thumb = DecodeHTMLEntities(thumb) if '&amp;' in thumb else thumb
+        thumb = thumb.split('url=')[1] if 'url=' in thumb else thumb
 
         oc.add(DirectoryObject(
             key=Callback(ShowMenu, title=stitle, thumb=thumb, url=ci.xpath('.//a/@href')[0]),
@@ -157,8 +158,8 @@ def SubMenu(title, href):
     try:
         paging = html.xpath('//div[@class="paging"]/a')[1]
         nhref = paging.get('href')
-    except:
-        Log.Warn(u"* Warning, no content for '{}'".format(BASE_URL + href))
+    except Exception as e:
+        Log.Warn(u"* Warning, no content for '{}' >>>\n{}".format(BASE_URL + href, e))
         nhref = None
 
     if nhref:
@@ -187,10 +188,7 @@ def SubMenu(title, href):
 def ShowMenu(title, thumb, url):
     oc = ObjectContainer(title2=title)
 
-    if Prefs['ssl_fix']:
-        html = HTTPS.ElementFromURL(url)
-    else:
-        html = HTML.ElementFromURL(url)
+    html = Network.ElementFromURL(url)
 
     dt = [d.strip() for d in html.xpath('//dt[text()="Type:"]/following-sibling::dd/text()') if (d.strip() != ',') and (d.strip() != '')]
     kind = dt[0] if dt else None

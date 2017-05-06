@@ -2,8 +2,11 @@
 
 """9anime.to Service Code"""
 
+from __builtin__ import hasattr
 from urllib import urlencode
-import https_fix as HTTPS
+import common as Common
+from network import Network
+from nineanime.jsfdecoder import JSFDecoder
 
 RE_NORM = Regex(r'(https?://(?:www\.)?\w+\.\w+)/watch/[^/]+/(\w+)')
 RE_DUR = Regex(r'(\d+) *?(h|min|sec)')
@@ -17,8 +20,7 @@ def NormalizeURL(url):
 ####################################################################################################
 def MetadataObjectForURL(url):
 
-    page = get_page(url)
-    html = HTML.ElementFromString(page)
+    html = Network.ElementFromURL(url)
 
     ep_num = html.xpath('//a[@class="active"]/@data-base')
     ep_num = ep_num[0] if ep_num else None
@@ -136,13 +138,33 @@ def PlayVideo(url, res='720', **kwargs):
     vid = r.group(2)
     data_url = base_url + '/ajax/episode/info?id=' + vid
 
-    data = JSON.ObjectFromString(get_page(data_url))
+    http_headers = {'Referer': url, 'User-Agent': Common.USER_AGENT}
+
+    # token handler
+    http_headers['Cookie'] = Network.get_cookies()
+    Log("* 9anime Cookies for {}\n{}".format(url, http_headers['Cookie']))
+
+    # grabber handler
+    resp = Network.Request(data_url, http_headers)
+    if hasattr(resp, 'text'):
+        data = resp.json()
+    elif hasattr(resp, 'content'):
+        data = JSON.ObjectFromString(resp.content)
+    else:
+        raise Ex.ContextException("9anime GrabberURL Request Failed. Contact Twoure with Log files.")
     grabber = clean_url(data['grabber'] + '?' + urlencode(data['params']))
 
-    streams = JSON.ObjectFromString(get_page(grabber))
-
+    # streams handler
+    resp = Network.Request(grabber, http_headers)
+    if hasattr(resp, 'text'):
+        streams = resp.json()
+    elif hasattr(resp, 'content'):
+        streams = JSON.ObjectFromString(resp.content)
+    else:
+        raise Ex.ContextException("9anime StreamURL Request Failed. Contact Twoure with Log files.")
     vurls = [{'label': int(s['label'][:-1]), 'file': s['file']} for s in streams['data'] if s['type'] == 'mp4']
     Log.Debug("* 9anime Video Sources: {}".format(vurls))
+
     vurl = None
     for s in Util.ListSortedByKey(vurls, 'label'):
         vurl = s['file']
@@ -163,15 +185,5 @@ def clean_url(url):
     if url.startswith('//'):
         url = 'https:' + url
     elif url.startswith('/'):
-        url = 'https://9anime.to' + url
+        url = Common.BASE_URL + url
     return url
-
-####################################################################################################
-def get_page(url):
-    try:
-        if Prefs['ssl_fix']:
-            return HTTPS.Request(url)
-        return HTTP.Request(url, cacheTime=10).content
-    except:
-        Log.Exception(u"* Error: Cannot open '{0}' >>>".format(url))
-    raise Ex.MediaNotAvailable

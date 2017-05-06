@@ -5,11 +5,5 @@
     "type": "enum",
     "values": ["Stable", "Development"],
     "default": "Stable"
-  },
-  {
-    "id": "ssl_fix",
-    "label": "SSL/TLS Fix",
-    "type": "bool",
-    "default": "False"
   }
 ]

@@ -1,0 +1,142 @@
+#!/usr/bin/env python
+
+from __builtin__ import getattr, hasattr
+from data import Data
+import common as Common
+from nineanime.jsfdecoder import JSFDecoder
+import requests
+import os
+
+
+class networking(object):
+    def __init__(self):
+        self.base_url = Common.BASE_URL
+        self.user_agent = Common.USER_AGENT
+        self.cache_time = Common.CACHE_TIME
+        self.url_cache_dir = Data.url_cache_dir
+        self.url_cache_path = Data.data_item_path(Data.url_cache_dir)
+        self.req = requests
+
+        Data.ensure_dirs(self.url_cache_path)
+
+    def dir_exists(self, path):
+        return os.path.exists(path) and os.path.isdir(path)
+
+    @property
+    def file_list(self):
+        fp = self.url_cache_path
+        return [f for f in Data.list_dir(fp) if Data.file_exists(Data.join_path(fp, f))]
+
+    def datetime_to_utc(self, dt):
+        n = Datetime.Now().replace(microsecond=0)
+        nutc = Datetime.UTCNow().replace(microsecond=0)
+        if n < nutc:
+            return dt + (nutc - n)
+        elif n == nutc:
+            return dt
+        return dt - (n - nutc)
+
+    def item_last_modified(self, path, utc=False):
+        if os.path.exists(path):
+            ts = os.path.getmtime(path)
+            if utc:
+                return self.datetime_to_utc(Datetime.FromTimestamp(ts)).replace(microsecond=0)
+            return Datetime.FromTimestamp(ts).replace(microsecond=0)
+        return Datetime.Now().replace(microsecond=0)
+
+    def clear_cache(self, timeout):
+        ctime = Datetime.Now()
+        count = 0
+        Log.Debug("* Clearing '{}' items older than {}".format(self.url_cache_dir, str(ctime - timeout)))
+        for fn in self.file_list:
+            fp = os.path.join(self.url_cache_path, fn)
+            if (self.item_last_modified(fp) + timeout) <= ctime:
+                if self.dir_exists(fp):
+                    continue
+                Data.Remove(os.path.join(self.url_cache_dir, fn))
+                count += 1
+        Log.Debug('* Cleaned {} Cached files from {}'.format(count, self.url_cache_dir))
+        return
+
+    def HTTPRequest(self, url, hname, headers=None, cacheTime=None, values=None, follow_redirects=True, method='GET', verify=True, count=0):
+        fallback = False
+        if not headers:
+            headers = {'Referer': url, 'User-Agent': self.user_agent}
+        if (method == 'POST') and cacheTime:
+            Log.Warn("* <network.HTTPRequest[warn]>: POST requests with cache time, saving with requests.")
+            fallback = True
+        if not fallback:
+            try:
+                res = HTTP.Request(url, headers=headers, cacheTime=cacheTime, values=values, follow_redirects=follow_redirects, method=method)
+                res.load()
+                res.headers.update({'Cookie': HTTP.CookiesForURL(url)})
+                return res
+            except Ex.URLError as e:
+                if "ssl" not in str(e):
+                    raise Ex.URLError
+                Log.Warn("* <networking.HTTPRequest[error]>: Normal Request failed, falling back to requests lib.")
+                Log.Warn("{}".format(e))
+                verify = False
+
+        nc = headers.get('Cookie', None)
+        cookies = dict((k,v) for (k,v) in Regex(r'(\w+)\=([^\;]+)').findall(nc)) if nc else {}
+
+        if values:
+            method = 'POST'
+        rm = getattr(self.req, method.lower())
+        try:
+            res = rm(url, headers=headers, cookies=cookies, data=values, verify=verify, allow_redirects=follow_redirects)
+            res.raise_for_status()
+            Log.Debug("* Caching '{}' to {}".format(url, self.url_cache_dir))
+            Data.Save(Data.HTTP(hname), res, True)
+            return res
+        except Exception as ee:
+            if 'ssl' in str(ee) and (count == 0):
+                res = self.HTTPRequest(url, hname, headers, cacheTime, values, follow_redirects, method, False, 1)
+                return res
+            Log.Error(u"* <networking.HTTPRequest[error]>: Cannot handle '{}'".format(url))
+            Log.Error(u"{}".format(ee))
+            raise Ex.ContextException("9anime HTTPRequest Failed. Contact Twoure with Log files.")
+
+    def Request(self, url, headers=None, cacheTime=None, values=None, follow_redirects=True, method='GET'):
+        if not cacheTime:
+            cacheTime = int(self.cache_time.total_seconds())
+        timeout = Datetime.Delta(seconds=cacheTime)
+        self.clear_cache(timeout)
+        res = None
+        hn = Hash.MD5(url)
+
+        if (len([fn for fn in self.file_list if fn == hn]) == 0):
+            return self.HTTPRequest(url, hn, headers, cacheTime, values, follow_redirects, method)
+
+        for fn in self.file_list:
+            if fn != hn:
+                continue
+            fp = os.path.join(self.url_cache_path, fn)
+            if (self.item_last_modified(fp) + timeout) <= Datetime.Now():
+                Log.Debug("* Re-Caching '{}' to {}".format(url, self.url_cache_dir))
+                return self.HTTPRequest(url, hn, headers, cacheTime, values, follow_redirects, method)
+            else:
+                Log.Debug("* Fetching '{}' from {}".format(url, self.url_cache_dir))
+                return Data.Load(Data.HTTP(fn), True)
+        raise Ex.MediaNotAvailable
+
+    def ElementFromURL(self, url, headers=None, cacheTime=None, values=None, follow_redirects=True, method='GET'):
+        res = self.Request(url, headers, cacheTime, values, follow_redirects, method)
+        return HTML.ElementFromString(res.content)
+
+    def get_cookies(self):
+        headers = {'Referer': self.base_url, 'User-Agent': self.user_agent}
+        try:
+            res = self.Request(self.base_url+'/token', headers)
+            c = list()
+            for cs in [ v for v in res.headers.values() if v.startswith('__cfduid') ]:
+                c.append(cs.split(';')[0])
+            c = dict((k, res.cookies[k]) for k in res.cookies.keys()) if hasattr(res, 'cookies') and len(c) == 0 else c
+            rk = Regex(r'cookie\=["\']([^"\';]+)').search(JSFDecoder(res.content).ca_decode())
+            return '; '.join(c + [rk.group(1)])
+        except:
+            Log.Exception("* <network.Request[error]>: Cannot handle token cookie >>>")
+        return ''
+
+Network = networking()
