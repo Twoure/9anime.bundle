@@ -59,12 +59,13 @@ class networking(object):
         return
 
     def HTTPRequest(self, url, hname, headers=None, cacheTime=None, values=None, follow_redirects=True, method='GET', verify=True, count=0):
-        fallback = False
+        #fallback = False
         if not headers:
             headers = {'Referer': url, 'User-Agent': self.user_agent}
         if (method == 'POST') and cacheTime:
             Log.Warn("* <network.HTTPRequest[warn]>: POST requests with cache time, saving with requests.")
             fallback = True
+        """
         if not fallback:
             try:
                 res = HTTP.Request(url, headers=headers, cacheTime=cacheTime, values=values, follow_redirects=follow_redirects, method=method)
@@ -77,7 +78,7 @@ class networking(object):
                 Log.Warn("* <networking.HTTPRequest[error]>: Normal Request failed, falling back to requests lib.")
                 Log.Warn("{}".format(e))
                 verify = False
-
+        """
         nc = headers.get('Cookie', None)
         cookies = dict((k,v) for (k,v) in Regex(r'(\w+)\=([^\;]+)').findall(nc)) if nc else {}
 
