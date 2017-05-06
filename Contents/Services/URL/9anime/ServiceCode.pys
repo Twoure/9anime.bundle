@@ -6,7 +6,6 @@ from __builtin__ import hasattr
 from urllib import urlencode
 import common as Common
 from network import Network
-from nineanime.jsfdecoder import JSFDecoder
 
 RE_NORM = Regex(r'(https?://(?:www\.)?\w+\.\w+)/watch/[^/]+/(\w+)')
 RE_DUR = Regex(r'(\d+) *?(h|min|sec)')
