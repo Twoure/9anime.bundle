@@ -145,22 +145,12 @@ def PlayVideo(url, res='720', **kwargs):
 
     # grabber handler
     resp = Network.Request(data_url, http_headers)
-    if hasattr(resp, 'text'):
-        data = resp.json()
-    elif hasattr(resp, 'content'):
-        data = JSON.ObjectFromString(resp.content)
-    else:
-        raise Ex.ContextException("9anime GrabberURL Request Failed. Contact Twoure with Log files.")
+    data = resp.json()
     grabber = clean_url(data['grabber'] + '?' + urlencode(data['params']))
 
     # streams handler
     resp = Network.Request(grabber, http_headers)
-    if hasattr(resp, 'text'):
-        streams = resp.json()
-    elif hasattr(resp, 'content'):
-        streams = JSON.ObjectFromString(resp.content)
-    else:
-        raise Ex.ContextException("9anime StreamURL Request Failed. Contact Twoure with Log files.")
+    streams = resp.json()
     vurls = [{'label': int(s['label'][:-1]), 'file': s['file']} for s in streams['data'] if s['type'] == 'mp4']
     Log.Debug("* 9anime Video Sources: {}".format(vurls))
 

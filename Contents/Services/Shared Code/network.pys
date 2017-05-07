@@ -55,30 +55,14 @@ class networking(object):
                     continue
                 Data.Remove(os.path.join(self.url_cache_dir, fn))
                 count += 1
-        Log.Debug('* Cleaned {} Cached files from {}'.format(count, self.url_cache_dir))
+        if (count > 0):
+            Log.Debug('* Cleaned {} Cached files from {}'.format(count, self.url_cache_dir))
         return
 
     def HTTPRequest(self, url, hname, headers=None, cacheTime=None, values=None, follow_redirects=True, method='GET', verify=True, count=0):
-        #fallback = False
         if not headers:
             headers = {'Referer': url, 'User-Agent': self.user_agent}
-        if (method == 'POST') and cacheTime:
-            Log.Warn("* <network.HTTPRequest[warn]>: POST requests with cache time, saving with requests.")
-            fallback = True
-        """
-        if not fallback:
-            try:
-                res = HTTP.Request(url, headers=headers, cacheTime=cacheTime, values=values, follow_redirects=follow_redirects, method=method)
-                res.load()
-                res.headers.update({'Cookie': HTTP.CookiesForURL(url)})
-                return res
-            except Ex.URLError as e:
-                if "ssl" not in str(e):
-                    raise Ex.URLError
-                Log.Warn("* <networking.HTTPRequest[error]>: Normal Request failed, falling back to requests lib.")
-                Log.Warn("{}".format(e))
-                verify = False
-        """
+
         nc = headers.get('Cookie', None)
         cookies = dict((k,v) for (k,v) in Regex(r'(\w+)\=([^\;]+)').findall(nc)) if nc else {}
 
@@ -133,7 +117,7 @@ class networking(object):
             c = list()
             for cs in [ v for v in res.headers.values() if v.startswith('__cfduid') ]:
                 c.append(cs.split(';')[0])
-            c = dict((k, res.cookies[k]) for k in res.cookies.keys()) if hasattr(res, 'cookies') and len(c) == 0 else c
+            c = dict((k, res.cookies[k]) for k in res.cookies.keys()) if hasattr(res, 'cookies') and (len(c) == 0) else c
             rk = Regex(r'cookie\=["\']([^"\';]+)').search(JSFDecoder(res.content).ca_decode())
             return '; '.join(c + [rk.group(1)])
         except:
