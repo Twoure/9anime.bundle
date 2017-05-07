@@ -2,7 +2,7 @@
 
 ##### 1.0.1
 - _05/07/17_
-  - Fixed video playback, thanks to @coder-alpha
+  - Fixed video playback, thanks to [@coder-alpha](https://github.com/coder-alpha)
   - switched to `requests` lib and custom caching
 
 ##### 1.0.0
