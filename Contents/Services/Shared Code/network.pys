@@ -47,7 +47,7 @@ class networking(object):
     def clear_cache(self, timeout):
         ctime = Datetime.Now()
         count = 0
-        Log.Debug("* Clearing '{}' items older than {}".format(self.url_cache_dir, str(ctime - timeout)))
+        #Log.Debug("* Clearing '{}' items older than {}".format(self.url_cache_dir, str(ctime - timeout)))
         for fn in self.file_list:
             fp = os.path.join(self.url_cache_path, fn)
             if (self.item_last_modified(fp) + timeout) <= ctime:
