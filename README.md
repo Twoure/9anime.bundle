@@ -3,9 +3,9 @@
 
 [![Codacy Badge](https://api.codacy.com/project/badge/Grade/87e4130322374e9e900fcc763a27eb4e)](https://www.codacy.com/app/twoure/9anime-bundle?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=Twoure/9anime.bundle&amp;utm_campaign=Badge_Grade) [![GitHub issues](https://img.shields.io/github/issues/Twoure/9anime.bundle.svg?style=flat)](https://github.com/Twoure/9anime.bundle/issues) [![](https://img.shields.io/github/release/Twoure/9anime.bundle.svg?style=flat)](https://github.com/Twoure/9anime.bundle/releases)
 
-This plugin creates a new Video Channel within [Plex Media Server](https://plex.tv/) (PMS) to view [Anime](https://en.wikipedia.org/wiki/Anime) from [9anime.to](http://9anime.to/).  It is currently under development and as such, should be considered alpha software and potentially unstable.
+This plugin creates a new Video Channel within [Plex Media Server](https://plex.tv/) (PMS) to view [Anime](https://en.wikipedia.org/wiki/Anime) from [9anime.to](https://9anime.to/).  It is currently under development and as such, should be considered alpha software and potentially unstable.
 
-> **Note:** the author of this plugin has no affiliation with [9anime.to](http://9anime.to/) nor the owners of the content that they host.
+> **Note:** the author of this plugin has no affiliation with [9anime.to](https://9anime.to/) nor the owners of the content that they host.
 
 ## Features
 
@@ -19,12 +19,12 @@ This plugin creates a new Video Channel within [Plex Media Server](https://plex.
 
 ##### Plex Media Server:
 - Tested Working:
-  - Ubuntu 14.04 LTS: PMS version 1.3.0
+  - Ubuntu 14.04 LTS: PMS version 1.6.1
 
 ##### Plex Clients:
 - Tested Working:
-  - Android (4.4.2) (Plex Client App, v5.3.2.632)
-  - Plex Web (2.12.6)
+  - Android (7.1.2) (Plex Client App, v5.8.0.475)
+  - Plex Web (3.5.0)
   - Chromecast
 
 ## Install

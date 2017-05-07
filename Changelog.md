@@ -1,5 +1,10 @@
 # ChangeLog
 
+##### 1.0.1
+- _05/07/17_
+  - Fixed video playback, thanks to @coder-alpha
+  - switched to `requests` lib and custom caching
+
 ##### 1.0.0
 - _12/27/16_
   - Enabled updater, added update prefs
