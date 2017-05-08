@@ -1,0 +1,201 @@
+#!/usr/bin/env python
+
+"""9anime.to Metadata"""
+
+from __builtin__ import iter
+import common as Common
+from network import Network
+
+
+class Metadata(object):
+    def __init__(self, url, method=0):
+        self.url = url
+        self.data_id = url.split('/')[-1]
+        self.html = Network.ElementFromURL(url)
+        self.isShow = method == 1  # 1=show
+        self.isSeason = method == 2  #2=season
+        self.isEpisode = method == 3  #3=episode
+        self.thumb_fallback = 'http://i.imgur.com/75YO83o.jpg'
+        self.art_fallback = 'http://i.imgur.com/8LmKZl2.jpg'
+        self.re_norm = Regex(r'(https?://(?:www\.)?\w+\.\w+)/watch/[^/]+/(\w+)')
+        self.re_dur = Regex(r'(\d+) *?(h|min|sec)')
+        self.server_list = list()
+        self.init_servers()
+
+    @property
+    def thumb(self):
+        thumb = self.html.xpath('//div/img/@src')
+        return thumb[0].split('url=')[1] if thumb else self.thumb_fallback
+
+    @property
+    def art(self):
+        art = self.html.xpath('//meta[@property="og:image"]/@content')
+        return art[0] if art else self.art_fallback
+
+    @property
+    def current_episode(self):
+        enode = self.html.xpath('//a[@class="active"][@data-base]')
+        for e in enode:
+            epn = int(e.get('data-base'))
+        return epn
+
+    @property
+    def show_name(self):
+        """TVShow name used with Episode, TVShow, and Season objects"""
+        show_name = self.html.xpath('//h1[@class="title"]/text()')
+        show_name = show_name[0].strip() if show_name else None
+        return show_name if show_name.lower().endswith('(dub)') else show_name + ' (Sub)'
+
+    @property
+    def kind(self):
+        t = self.html.xpath('//dt[text()="Type:"]/following-sibling::dd/text()')
+        dur = self.html.xpath('//dt[text()="Duration:"]/following-sibling::dd/text()')
+        if t:
+            k = 'TV' if 'tv' in t[0].lower() else ('Movie' if 'movie' in t[0].lower() else t[0])
+        else:
+            k = 'TV'
+        if dur:
+            k = 'TV' if 'episode' in dur[0].lower() else k
+        return k
+
+    @property
+    def kind_simple(self):
+        return 'Movie' if 'movie' in self.kind.lower() else 'TV'
+
+    @property
+    def item_oaa(self):
+        oaa = self.html.xpath('//dt[text()="Date aired:"]/following-sibling::dd/text()')
+        oaa = oaa[0].split(' to ')[0].strip() if oaa else None
+        try:
+            oaa = Datetime.ParseDate(oaa) if oaa else None
+        except:
+            oaa = None
+        return oaa
+
+    @property
+    def oaa(self):
+        oaa = self.html.xpath('//a[@class="active"][@data-base]/@data-title')
+        try:
+            oaa = Datetime.ParseDate(oaa[0]) if oaa else None
+        except:
+            oaa = self.item_oaa
+        return oaa
+
+    @property
+    def item_year(self):
+        if self.item_oaa:
+            return int(self.item_oaa.year)
+        elif self.oaa:
+            return int(self.oaa.year)
+        return None
+
+    @property
+    def year(self):
+        if self.oaa:
+            return int(self.oaa.year)
+        return None
+
+    @property
+    def score(self):
+        score = self.html.xpath('//dt[text()="Scores:"]/following-sibling::dd/text()')
+        return float(score[0].split(' / ')[0].strip()) if score else None
+
+    @property
+    def duration(self):
+        dur = self.html.xpath('//dt[text()="Duration:"]/following-sibling::dd/text()')
+        dur = dur[0].split('/')[0].strip() if dur else None
+        try:
+            duration = Datetime.MillisecondsFromString(dur)
+        except:
+            try:
+                duration = 0
+                for i, s in self.re_dur.findall(dur):
+                    if s == 'h':
+                        duration += int(i)*60*60*1000
+                    elif s == 'min':
+                        duration += int(i)*60*1000
+                    elif s == 'sec':
+                        duration += int(i)*1000
+            except:
+                duration = None
+        return duration
+
+    @property
+    def summary(self):
+        des = self.html.xpath('//div[@class="desc"]/text()')
+        return des[0].strip() if des else None
+
+    @property
+    def tags(self):
+        return self.html.xpath('//div[@id="tags"]/a/text()')
+
+    @property
+    def genres(self):
+        return self.html.xpath('//dt[text()="Genre:"]/following-sibling::dd/a/text()')
+
+    def i_for_name(self, name):
+        if '1' in name:
+            return 1
+        elif '2' in name:
+            return 2
+        return 3
+
+    def seasons(self, server=1):
+        for sld in self.server_list:
+            if (sld['server_number'] == server):
+                return sld['seasons']
+        return list()
+
+    def episodes(self, season_number=0, server_number=1):
+        seasons = self.seasons(server_number)
+        if seasons:
+            return seasons[season_number]
+        return list()
+
+    def format_episode(self, sea, epn, ser, comment, href):
+        if comment.isdigit():
+            title = u'S{}E{}'.format(sea,epn)
+        else:
+            title = u'S{}E{} | {}'.format(sea, epn, comment)
+        Log(u"* found for S{}E{} on server {}".format(sea, epn, ser))
+        return {
+            'title': title, 'epn': epn, 'season': sea,
+            'server': ser, 'href': href
+            }
+
+
+    def episode(self, ep_num=1, sea_num=0, ser_num=1, active=True):
+        ser_pri = [ser_num] + list(set([1,2,3]) - set([ser_num]))
+        for ser in ser_pri:
+            for sea in sorted(self.seasons(ser).keys()):
+                if not active and (sea_num != sea):
+                    continue
+                for enode in self.episodes(sea, ser):
+                    comment = enode.get('data-comment')
+                    epn = enode.get('data-base')
+                    href = enode.get('href')
+                    data_id = enode.get('data-id')
+                    if active and ((enode.get('class') == 'active') or data_id == self.data_id):
+                        return self.format_episode(sea, epn, ser, comment, href)
+                    elif (active == False) and (ep_num == int(epn)):
+                        return self.format_episode(sea_num, epn, ser, comment, href)
+        return dict()
+
+    def init_servers(self):
+        if self.server_list:
+            return self.server_list
+        for i, s in enumerate(self.html.xpath('//div[@class="server row"]')):
+            node = s.xpath("./label")
+            name = node[0].text_content().strip() if node else None
+            if not name:
+                continue
+
+            for season in s.xpath('.//ul[@data-range-id]'):
+                season_number = int(season.get('data-range-id'))
+                season_dict = {season_number: season.xpath('./li/a')}
+
+            self.server_list.append({
+                'server_number': self.i_for_name(name), 'list_index': i,
+                'name': name, 'seasons': season_dict
+                })
+        return

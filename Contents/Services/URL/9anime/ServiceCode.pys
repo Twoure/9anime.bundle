@@ -2,14 +2,13 @@
 
 """9anime.to Service Code"""
 
-from __builtin__ import hasattr
 from urllib import urlencode
 import common as Common
 from network import Network
+from metadata import Metadata
 
 RE_NORM = Regex(r'(https?://(?:www\.)?\w+\.\w+)/watch/[^/]+/(\w+)')
-RE_DUR = Regex(r'(\d+) *?(h|min|sec)')
-FALLBACK = 'http://i.imgur.com/75YO83o.jpg'
+SERVER_DICT = {'9anime.1': 1, '9anime.2': 2, 'Openload': 3}
 
 ####################################################################################################
 def NormalizeURL(url):
@@ -19,94 +18,37 @@ def NormalizeURL(url):
 ####################################################################################################
 def MetadataObjectForURL(url):
 
-    html = Network.ElementFromURL(url)
-
-    ep_num = html.xpath('//a[@class="active"]/@data-base')
-    ep_num = ep_num[0] if ep_num else None
-
-    show_name = html.xpath('//h1[@class="title"]/text()')
-    show_name = show_name[0].strip() if show_name else None
-    show_name = show_name if (show_name.endswith('(Dub)') or show_name.endswith('(DUB)')) else show_name + ' (Sub)'
-
-    if (ep_num is None) and (show_name is None):
-        raise Ex.MediaExpired
-
-    art = html.xpath('//meta[@property="og:image"]/@content')
-    art = art[0] if art else None
-
-    thumb = html.xpath('//div/img/@src')
-    thumb = thumb[0].split('url=')[1] if thumb else FALLBACK
-
-    kind = html.xpath('//dt[text()="Type:"]/following-sibling::dd/text()')
-    kind = kind[0] if kind else None
-
-    oaa = html.xpath('//dt[text()="Date aired:"]/following-sibling::dd/text()')
-    oaa = oaa[0].split(' to ')[0].strip() if oaa else None
-    try:
-        oaa = Datetime.ParseDate(oaa)
-    except:
-        oaa = None
-
-    score = html.xpath('//dt[text()="Scores:"]/following-sibling::dd/text()')
-    score = float(score[0].split(' / ')[0].strip()) if score else None
-
-    dur = html.xpath('//dt[text()="Duration:"]/following-sibling::dd/text()')
-    dur = dur[0].split('/')[0].strip() if dur else None
-    try:
-        duration = Datetime.MillisecondsFromString(dur)
-    except:
-        try:
-            duration = 0
-            for i, s in RE_DUR.findall(dur):
-                if s == 'h':
-                    duration += int(i)*60*60*1000
-                elif s == 'min':
-                    duration += int(i)*60*1000
-                elif s == 'sec':
-                    duration += int(i)*1000
-        except:
-            duration = None
-
-    des = html.xpath('//div[@class="desc"]/text()')
-    summary = des[0].strip() if des else None
-
-    tags = html.xpath('//div[@id="tags"]/a/text()')
-    genres = html.xpath('//dt[text()="Genre:"]/following-sibling::dd/a/text()')
-
-
-    if kind and 'movie' in kind.lower():
+    meta = Metadata(url)
+    if meta.kind_simple == 'Movie':
         return MovieObject(
-            title=show_name,
-            rating=score,
-            originally_available_at=oaa,
-            year=int(oaa.year) if oaa else None,
-            duration=duration,
-            tags=tags if tags else [],
-            genres=genres if genres else [],
-            thumb=Resource.ContentsOfURLWithFallback([thumb, FALLBACK]),
-            art=art,
-            summary=summary,
-            source_title='9anime'
+            title=meta.show_name,
+            source_title='9anime',
+            rating=meta.score,
+            duration=meta.duration,
+            genres=meta.genres,
+            tags=meta.tags,
+            originally_available_at=meta.oaa,
+            year=meta.year,
+            thumb=Resource.ContentsOfURLWithFallback([meta.thumb, meta.thumb_fallback]),
+            art=Resource.ContentsOfURLWithFallback([meta.art, meta.art_fallback]),
+            summary=meta.summary
             )
-
-    elif kind:
-        season = 1 if 'tv' in kind.lower() else 0
-    else:
-        season = 0
-
+    ep = meta.episode(ser_num=SERVER_DICT[Prefs['server']])
+    Log("* ep_dict = {}".format(ep))
     return EpisodeObject(
-        title='Episode ' + ep_num,
-        show=show_name,
-        season=season,
-        index=int(ep_num),
-        rating=score,
-        #originally_available_at=oaa,  #no oaa per ep :( only for start/end of seasons
-        duration=duration,
-        tags=tags if tags else [],
-        thumb=Resource.ContentsOfURLWithFallback([thumb, FALLBACK]),
-        art=art,
-        summary=summary,
-        source_title='9anime'
+        title=ep['title'] if ep else meta.show_name,
+        show=meta.show_name,
+        season=int(ep['season']) if ep else 0,
+        index=int(ep['epn']) if ep else 0,
+        source_title='9anime',
+        rating=meta.score,
+        duration=meta.duration,
+        tags=meta.tags,
+        originally_available_at=meta.oaa,
+        #year=meta.year,
+        thumb=Resource.ContentsOfURLWithFallback([meta.thumb, meta.thumb_fallback]),
+        art=Resource.ContentsOfURLWithFallback([meta.art, meta.art_fallback]),
+        summary=meta.summary
         )
 
 ####################################################################################################
@@ -129,6 +71,7 @@ def MediaObjectsForURL(url):
 ####################################################################################################
 @indirect
 def PlayVideo(url, res='720', **kwargs):
+
     r = RE_NORM.search(url)
     if not r:
         raise Ex.MediaNotAvailable
