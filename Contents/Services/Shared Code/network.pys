@@ -6,6 +6,11 @@ import common as Common
 from nineanime.jsfdecoder import JSFDecoder
 
 try:
+    import execjs
+    execjs.eval("{a:true,b:function (){}}")
+    Log('execjs loaded from v1.4.0')
+except ImportError as e:
+    Log.Warn('Failed to import execjs, falling back to v1.1.0 >>> {}'.format(e))
     import execjs_110 as execjs
     execjs.eval("{a:true,b:function (){}}")
     Log('execjs loaded from v1.1.0')
