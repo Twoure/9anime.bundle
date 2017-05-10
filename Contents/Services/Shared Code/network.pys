@@ -4,6 +4,15 @@ from __builtin__ import getattr, hasattr
 from data import Data
 import common as Common
 from nineanime.jsfdecoder import JSFDecoder
+
+try:
+    import execjs_110 as execjs
+    execjs.eval("{a:true,b:function (){}}")
+    Log('execjs loaded from v1.1.0')
+except ImportError as e:
+    Log.Error('Failed to import execjs >>> {}'.format(e))
+    execjs = None
+
 import requests
 import os
 
@@ -118,8 +127,19 @@ class networking(object):
             for cs in [ v for v in res.headers.values() if v.startswith('__cfduid') ]:
                 c.append(cs.split(';')[0])
             c = dict((k, res.cookies[k]) for k in res.cookies.keys()) if hasattr(res, 'cookies') and (len(c) == 0) else c
-            rk = Regex(r'cookie\=["\']([^"\';]+)').search(JSFDecoder(res.content).ca_decode())
-            return '; '.join(c + [rk.group(1)])
+            try:
+                t = JSFDecoder(res.content).ca_decode()
+                if 'function' in t:
+                    raise ValueError("JSFDecoder: No JSF code found")
+            except Exception as e:
+                Log.Debug('JSFDecoder failed, falling back to exejs >>> {}'.format(e))
+                d = String.Base64Decode(
+                    "dmFyIGRvY3VtZW50ID0gdGhpczsgdGhpcy5sb2NhdGlvbiA9ICJodHRwczovLzlhbm"
+                    "ltZS50by8iOyAlczsgdmFyIGpzc3Vja2l0ID0gZG9jdW1lbnQuY29va2llLnRvU3RyaW5nKCk7"
+                    )
+                ctx = execjs.compile(d %res.content)
+                t = ctx.exec_('return jssuckit')
+            return '; '.join(c + [t.split(';')[0]])
         except:
             Log.Exception("* <network.Request[error]>: Cannot handle token cookie >>>")
         return ''
