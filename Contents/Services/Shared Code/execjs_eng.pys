@@ -1,0 +1,56 @@
+#!/usr/bin/env python
+# must import Common first before using this loder
+
+
+class PlexJS(object):
+    def __init__(self):
+        self.test_string = "{a:true,b:function (){}}"
+        self.jres = ['Node', 'Nashorn']
+        self.import_execjs()
+        if self.test():
+            Log("Using execjs {}, with '{}'".format(self.ver, self.runtime.name))
+        else:
+            Log.Error("PyExecJS failed to initialize. Contact Twoure with logs.")
+
+    def import_execjs(self, fallback=False):
+        ver = None
+        if fallback:
+            try:
+                import execjs_110 as execjs
+                ver = "v1.1.0"
+            except:
+                execjs = None
+        else:
+            try:
+                import execjs
+                ver = "v1.4.0"
+            except ImportError:
+                return self.import_execjs(True)
+            except:
+                execjs = None
+        self.execjs = execjs
+        self.ver = ver if ver else "Null"
+
+    @property
+    def runtime(self):
+        for (n, r) in self.execjs.runtimes().items():
+            if not r.is_available():
+                continue
+            elif n not in self.jres:
+                continue
+            return r
+        return None
+
+    def test(self):
+        try:
+            self.runtime.eval(self.test_string)
+        except Exception as e:
+            Log.Warn('execjs({}) failed, trying fallback method. >>>\n{}'.format(self.ver, e))
+            self.import_execjs(True)
+            self.runtime = self.setup_runtime()
+            self.runtime.eval(self.test_string)
+        except:
+            return False
+        return True
+
+JSEngine = PlexJS().runtime

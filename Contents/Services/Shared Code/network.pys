@@ -4,20 +4,7 @@ from __builtin__ import getattr, hasattr
 from data import Data
 import common as Common
 from nineanime.jsfdecoder import JSFDecoder
-
-try:
-    import execjs
-    execjs.eval("{a:true,b:function (){}}")
-    Log('execjs loaded from v1.4.0')
-except ImportError as e:
-    Log.Warn('Failed to import execjs, falling back to v1.1.0 >>> {}'.format(e))
-    import execjs_110 as execjs
-    execjs.eval("{a:true,b:function (){}}")
-    Log('execjs loaded from v1.1.0')
-except ImportError as e:
-    Log.Error('Failed to import execjs >>> {}'.format(e))
-    execjs = None
-
+from execjs_eng import JSEngine
 import requests
 import os
 
@@ -138,11 +125,11 @@ class networking(object):
                     raise ValueError("JSFDecoder: No JSF code found")
             except Exception as e:
                 Log.Debug('JSFDecoder failed, falling back to exejs >>> {}'.format(e))
-                d = String.Base64Decode(
+                d = D(
                     "dmFyIGRvY3VtZW50ID0gdGhpczsgdGhpcy5sb2NhdGlvbiA9ICJodHRwczovLzlhbm"
                     "ltZS50by8iOyAlczsgdmFyIGpzc3Vja2l0ID0gZG9jdW1lbnQuY29va2llLnRvU3RyaW5nKCk7"
                     )
-                ctx = execjs.compile(d %res.content)
+                ctx = JSEngine.compile(d %res.content)
                 t = ctx.exec_('return jssuckit')
             return '; '.join(c + [t.split(';')[0]])
         except:
