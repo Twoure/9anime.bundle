@@ -136,4 +136,15 @@ class networking(object):
             Log.Exception("* <network.Request[error]>: Cannot handle token cookie >>>")
         return ''
 
+    def get_cookies_page(self, page):
+        cookies = page.cookies
+        c = list()
+        for each in cookies:
+            c.append(str(each).split('Cookie ')[1].rsplit(' for ')[0])
+        return '; '.join(c)
+	
+    def unCache(self, url):
+        hn = Hash.MD5(url)
+        Data.Remove(Data.HTTP(hn))		
+
 Network = networking()

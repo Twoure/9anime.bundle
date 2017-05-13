@@ -7,6 +7,9 @@ Common = SharedCodeService.common
 Network = SharedCodeService.network.Network
 from DumbTools import DumbKeyboard, DumbPrefs
 
+import time
+from lxml import html as HTML
+
 # setup global variables
 TITLE                       = Common.TITLE
 PREFIX                      = Common.PREFIX
@@ -91,18 +94,36 @@ def MainMenu():
         prefs_thumb = R(PREFS_ICON)
         search_thumb = R(SEARCH_ICON)
 
-    if Prefs['update_channel'] == 'Stable':
-        # Setup Updater to track latest release
-        Updater.gui_update(
-            PREFIX + '/updater', oc, GIT_REPO,
-            tag='latest', list_view_clients=Common.LIST_VIEW_CLIENTS
-            )
-    else:
-        # Setup Updater to track branch commits
-        Updater.gui_update(
-            PREFIX + '/updater', oc, GIT_REPO,
-            branch='dev', list_view_clients=Common.LIST_VIEW_CLIENTS
-            )
+    # if Prefs['update_channel'] == 'Stable':
+        # # Setup Updater to track latest release
+        # Updater.gui_update(
+            # PREFIX + '/updater', oc, GIT_REPO,
+            # tag='latest', list_view_clients=Common.LIST_VIEW_CLIENTS
+            # )
+    # else:
+        # # Setup Updater to track branch commits
+        # Updater.gui_update(
+            # PREFIX + '/updater', oc, GIT_REPO,
+            # branch='dev', list_view_clients=Common.LIST_VIEW_CLIENTS
+            # )
+
+    if Prefs['Login']:
+        values = {
+            'username': Prefs['Username'],
+            'password': Prefs['Password'],
+            'remember': '1'
+        }
+        Network.unCache(BASE_URL + '/user/login')
+        page = Network.Request(BASE_URL + '/user/login', values= values, method = 'POST')
+        cookies = Network.get_cookies_page(page)
+
+        oc.add(DirectoryObject(
+            key=Callback(OnDeck, title='On Deck', cookies= cookies), title = 'On Deck'
+            ))
+
+        oc.add(DirectoryObject(
+            key=Callback(Watchlist, title='Watchlist', cookies= cookies), title = 'Watchlist'
+            ))
 
     # setup basic main menus
     for (t, h) in MAIN_MENUS.items():
@@ -131,6 +152,222 @@ def MainMenu():
 def ValidatePrefs():
     """check prefs, placeholder for now"""
 
+####################################################################################################
+@route(PREFIX + '/watchlist')
+def Watchlist(title, cookies):
+    oc = ObjectContainer(title2=title)
+
+    page = Network.Request(BASE_URL + '/user/watchlist', headers = {'referer': BASE_URL, 'cookie': cookies})
+    page_data = HTML.fromstring(page.text)
+	
+    list_tabs = page_data.xpath("//div[@class='tabs']/a")
+	
+    for each in list_tabs:
+		
+        tab = each.xpath("./@data-name")[0]
+        title = each.xpath("./text()")[0]
+		
+        oc.add(DirectoryObject(
+                key = Callback(WatchlistTab, title = title, href = '/user/watchlist?folder=' + tab, cookies = cookies),
+                title = title
+            )
+        )   
+
+    return oc
+
+####################################################################################################
+@route(PREFIX + '/watchlisttab')
+def WatchlistTab(title, href, cookies):
+    oc = ObjectContainer(title2=title)
+
+    Network.unCache(BASE_URL + href)
+    page = Network.Request(BASE_URL + href, headers = {'referer': BASE_URL, 'cookie': cookies})
+    page_data = HTML.fromstring(page.text)
+    
+    tab = href.split("folder=",1)[1].split("&",1)[0]
+ 
+    list_show = page_data.xpath("//div[@data-name='" + tab + "']/div[@class='links']/div")
+    
+    for each in list_show:
+
+        url = BASE_URL + each.xpath("./div/a/@href")[0]
+            
+        title_show = url.split("watch/",1)[1].split(".",1)[0].replace("-"," ")
+        
+        thumb = each.xpath("./div/img/@src")[0]
+        thumb = DecodeHTMLEntities(thumb) if '&amp;' in thumb else thumb
+        thumb = thumb.split('url=')[1] if 'url=' in thumb else thumb
+        
+        oc.add(DirectoryObject(
+            key=Callback(ShowMenu, title=title_show, thumb=thumb, url=url, cookies=cookies),
+            title=title_show, thumb=thumb
+            ))
+
+    oc.add(DirectoryObject(
+        key=Callback(Random, title='Random', tab = tab, cookies= cookies), title = 'Random'
+        ))
+
+    try:
+        paging = page_data.xpath('//div[@data-name="' + tab + '"]//div[@class="paging"]//li')
+        Log(paging)
+        paging = paging[len(paging)-1]
+        if paging.get('class') == "disabled":
+            nhref = None
+        else:
+            paging = paging.xpath('./a')[0]
+            nhref = paging.get('href')
+    except Exception as e:
+        Log.Warn(u"* Warning, no content for '{}' >>>\n{}".format(BASE_URL + href, e))
+        nhref = None
+
+    if nhref:
+        nhref = nhref if nhref.startswith('/') else '/'+nhref
+        page = nhref.split('page=')[1]
+        if Regex(r'P(\d+)$').search(title):
+            title = Regex(r'P(\d+)$').sub('P' + page, title)
+        else:
+            title = title + ' P' + page
+        oc.add(NextPageObject(
+            key=Callback(WatchlistTab, title=title, href=nhref, cookies = cookies),
+            title='Next Page {}>>'.format(int(page)), thumb=R(NEXT_ICON)
+            ))
+    
+    return oc
+
+####################################################################################################
+@route(PREFIX + "/random")
+def Random(title, tab, cookies):
+
+    oc = ObjectContainer(title2=title)
+
+    page = Network.Request(BASE_URL + '/user/watchlist', headers = {'referer': BASE_URL, 'cookie': cookies})
+    page_data = HTML.fromstring(page.text)
+    
+    try:
+        pages = page_data.xpath("//div[@data-name='" + tab + "']//ul[@class='pagination']//li")
+        num_pages = len(pages)-2
+        list_show = page_data.xpath("//div[@data-name='" + tab + "']/div[@class='links']/div")
+        num_per_page = len(list_show)
+        paging = pages[len(pages)-2]
+        paging = paging.xpath('./a')[0]
+        href = paging.get('href')
+        page = Network.Request(BASE_URL + "/" + href, headers = {'referer': BASE_URL, 'cookie': cookies})
+        page_data = HTML.fromstring(page.text)
+        list_show = page_data.xpath("//div[@data-name='" + tab + "']/div[@class='links']/div")
+        num_show = len(list_show) + (num_pages - 1)*num_per_page
+    except:
+        list_show = page_data.xpath("//div[@data-name='" + tab + "']/div[@class='links']/div")
+        num_show = len(list_show)
+        num_per_page = len(list_show)
+
+    
+    random_value = int(time.time())%num_show
+
+    page_number = int(random_value/num_per_page) + 1
+    page = Network.Request(BASE_URL + "/user/watchlist?folder=" + tab + "&" + tab + "-page=" + str(page_number), headers = {'referer': BASE_URL, 'cookie': cookies})
+    page_data = HTML.fromstring(page.text)
+    list_show = page_data.xpath("//div[@data-name='" + tab + "']/div[@class='links']/div")
+    
+    random_value = random_value - num_per_page*(page_number - 1)
+    url = BASE_URL + list_show[random_value].xpath("./div/a/@href")[0]
+        
+    title_show = url.split("watch/",1)[1].split(".",1)[0].replace("-"," ")
+        
+    thumb = list_show[random_value].xpath("./div/img/@src")[0]
+    thumb = DecodeHTMLEntities(thumb) if '&amp;' in thumb else thumb
+    thumb = thumb.split('url=')[1] if 'url=' in thumb else thumb
+        
+    oc.add(DirectoryObject(
+        key=Callback(ShowMenu, title=title_show, thumb=thumb, url=url, cookies=cookies),
+        title=title_show, thumb=thumb
+        ))
+    
+    return oc    
+
+####################################################################################################
+@route(PREFIX + '/ondeck')
+def OnDeck(title, cookies):
+    
+    oc = ObjectContainer(title2=title)
+	
+    Network.unCache(BASE_URL + '/user/watchlist')
+    
+    page = Network.Request(BASE_URL + '/user/watchlist', headers = {'referer': BASE_URL, 'cookie': cookies})
+    page_data = HTML.fromstring(page.text)
+    
+    list_show = page_data.xpath("//div[@data-name='watching']/div[@class='links']/div")
+    
+    for each in list_show:
+        
+        try:
+            episode_number = int(each.xpath("./div[@class='link']/span[@class='current']/text()")[0]) + 1
+            show_url = each.xpath("./div/a/@href")[0].rsplit("?",1)[0]
+            title = show_url.split("watch/",1)[1].split(".",1)[0].replace("-"," ")
+            
+            try:
+                max_episode_number = each.xpath("./div[@class='info']/span[@class='status']/text()")[0]
+                Log(max_episode_number)
+                max_episode_number = int(Regex(r'\D*(\d+).*\/').search(max_episode_number).group(1))
+                Log(max_episode_number)
+                if episode_number > max_episode_number:
+                    episode_number = None
+
+            except:
+                episode_number = 1
+                
+        except:
+            episode_number = 1
+
+        if episode_number:
+            html = Network.ElementFromURL(BASE_URL+show_url)
+
+            dt = [d.strip() for d in html.xpath('//dt[text()="Type:"]/following-sibling::dd/text()') if (d.strip() != ',') and (d.strip() != '')]
+            kind = dt[0] if dt else None
+
+            server_node = html.xpath('//div[@data-type="direct"]')
+            if not server_node:
+                oc.header = 'Warning'
+                oc.message = 'There is no episodes for this anime, we will update asap!'
+
+            db = html.xpath("//div[@id='servers']/div[@class='server row'][1]//li/a[@data-base='" + str(episode_number) + "']")[0]
+			
+            thumb = html.xpath("//div[@id='info']//img/@src")[0]
+            thumb = DecodeHTMLEntities(thumb) if '&amp;' in thumb else thumb
+            thumb = thumb.split('url=')[1] if 'url=' in thumb else thumb
+
+            ep = db.get('data-base')
+            href = db.get('href')
+            etitle = db.text
+            
+            active = db.get('class')
+            if active == 'active':
+                etitle = '*' + etitle
+
+            if kind and 'movie' in kind.lower():
+                oc.add(MovieObject(
+                    title=etitle,
+                    thumb=thumb,
+                    source_title='9anime',
+                    url=href if href.startswith(BASE_URL) else BASE_URL + href
+                    ))
+            else:
+                if kind:
+                    season = 1 if 'tv' in kind.lower() else 0
+                else:
+                    season = 0
+
+                oc.add(EpisodeObject(
+                    title=etitle,
+                    show=title,
+                    index=int(ep),
+                    season=season,
+                    thumb=thumb,
+                    source_title='9anime',
+                    url=href if href.startswith(BASE_URL) else BASE_URL + href
+                    ))
+    
+    return oc    
+	
 ####################################################################################################
 @route(PREFIX + '/submenu')
 def SubMenu(title, href):
@@ -185,10 +422,14 @@ def SubMenu(title, href):
 
 ####################################################################################################
 @route(PREFIX + '/showmenu')
-def ShowMenu(title, thumb, url):
+def ShowMenu(title, thumb, url, cookies=None):
     oc = ObjectContainer(title2=title)
 
-    html = Network.ElementFromURL(url)
+    if cookies:
+        page = Network.Request(url, headers = {'referer': BASE_URL, 'cookie': cookies})
+        html = HTML.fromstring(page.text)
+    else:
+        html = Network.ElementFromURL(url)
 
     dt = [d.strip() for d in html.xpath('//dt[text()="Type:"]/following-sibling::dd/text()') if (d.strip() != ',') and (d.strip() != '')]
     kind = dt[0] if dt else None
@@ -203,6 +444,11 @@ def ShowMenu(title, thumb, url):
         ep = db.get('data-base')
         href = db.get('href')
         etitle = db.text
+		
+        if cookies:
+            active = db.get('class')
+            if active == 'active':
+                etitle = '*' + etitle
 
         if kind and 'movie' in kind.lower():
             oc.add(MovieObject(

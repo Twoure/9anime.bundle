@@ -12,5 +12,30 @@
     "type": "enum",
     "values": ["9anime.1", "9anime.2", "Openload"],
     "default": "9anime.1"
+  },
+  {
+    "id": "Login",
+    "label": "Enable Log",
+    "type": "bool",
+    "default": "false"
+  },
+  {
+    "id": "Username",
+    "label": "Username",
+    "type": "text",
+    "default": ""
+  },
+  {
+    "id": "Password",
+    "label": "Password",
+    "type": "text",
+    "default": "",
+    "option": "hidden"
+  },
+  {
+    "id": "ListSwitching",
+    "label": "Enable Automatic List Switching",
+    "type": "bool",
+    "default": "false"
   }
 ]
