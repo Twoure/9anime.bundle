@@ -47,7 +47,7 @@ class PlexJS(object):
         except Exception as e:
             Log.Warn('execjs({}) failed, trying fallback method. >>>\n{}'.format(self.ver, e))
             self.import_execjs(True)
-            self.runtime = self.setup_runtime()
+            #self.runtime = self.setup_runtime()
             self.runtime.eval(self.test_string)
         except:
             return False
