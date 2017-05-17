@@ -36,21 +36,23 @@ class PlexJS(object):
         for (n, r) in self.execjs.runtimes().items():
             if not r.is_available():
                 continue
-            elif n not in self.jres:
+            Log("Checking if '{}' is allowed in PlexJS.".format(n))
+            if n not in self.jres:
                 continue
             return r
-        return None
+        return
 
     def test(self):
         try:
             self.runtime.eval(self.test_string)
         except Exception as e:
-            Log.Warn('execjs({}) failed, trying fallback method. >>>\n{}'.format(self.ver, e))
-            self.import_execjs(True)
-            self.runtime = self.setup_runtime()
-            self.runtime.eval(self.test_string)
-        except:
-            return False
+            try:
+                Log.Warn('1 - execjs({}) failed, trying fallback method. >>>\n{}'.format(self.ver, e))
+                self.import_execjs(True)
+                self.runtime.eval(self.test_string)
+            except:
+                Log.Exception('execjs({}) failed, cannot load execjs. Contact Twoure with logs.'.format(self.ver))
+                return False
         return True
 
 JSEngine = PlexJS().runtime
