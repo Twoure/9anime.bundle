@@ -115,9 +115,10 @@ class networking(object):
         headers = {'Referer': self.base_url, 'User-Agent': self.user_agent}
         try:
             res = self.Request(self.base_url+'/token', headers)
-            c = list()
-            for cs in [ v for v in res.headers.values() if v.startswith('__cfduid') ]:
-                c.append(cs.split(';')[0])
+            c = dict()
+            for cs in [ v.split(';')[0] for v in res.headers.values() if v.startswith('__cfduid') ]:
+                kk,vv = cs.split('=')
+                c.update({kk:vv})
             c = dict((k, res.cookies[k]) for k in res.cookies.keys()) if hasattr(res, 'cookies') and (len(c) == 0) else c
             try:
                 t = JSFDecoder(res.content).ca_decode()
@@ -126,12 +127,13 @@ class networking(object):
             except Exception as e:
                 Log.Debug('JSFDecoder failed, falling back to exejs >>> {}'.format(e))
                 d = D(
-                    "dmFyIGRvY3VtZW50ID0gdGhpczsgdGhpcy5sb2NhdGlvbiA9ICJodHRwczovLzlhbm"
-                    "ltZS50by8iOyAlczsgdmFyIGpzc3Vja2l0ID0gZG9jdW1lbnQuY29va2llLnRvU3RyaW5nKCk7"
-                    )
-                ctx = JSEngine.compile(d %res.content)
+                    "dmFyIGpzcyA9ICIiOyB2YXIgZG9jdW1lbnQgPSB0aGlzOyB0aGlzLmxvY2F0aW9uID0gIiVzIjsgJX"
+                    "M7IHZhciBqc3N1Y2tpdCA9IGpzcyArICI7ICIgKyBkb2N1bWVudC5jb29raWUudG9TdHJpbmcoKTs_"
+                    ) %(self.base_url, res.content.replace('=/";', '=/";jss=document.cookie.toString();'))
+                ctx = JSEngine.compile(d)
                 t = ctx.exec_('return jssuckit')
-            return '; '.join(c + [t.split(';')[0]])
+            [c.update({k:v}) for (k,v) in Regex(r'(\w+)\=([^\;]+)').findall(t) if (k != 'expires') and (k != 'path')]
+            return '; '.join([ '{}={}'.format(k,c[k]) for k in c.keys() ])
         except:
             Log.Exception("* <network.Request[error]>: Cannot handle token cookie >>>")
         return ''
