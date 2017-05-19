@@ -126,13 +126,20 @@ class networking(object):
                     raise ValueError("JSFDecoder: No JSF code found")
             except Exception as e:
                 Log.Debug('JSFDecoder failed, falling back to exejs >>> {}'.format(e))
+                tok = Regex(r'((\w\[\w\])\=[^\;]+\;)').sub(r'\1jssuckit.push(\2);', res.content)
                 d = D(
-                    "dmFyIGpzcyA9ICIiOyB2YXIgZG9jdW1lbnQgPSB0aGlzOyB0aGlzLmxvY2F0aW9uID0gIiVzIjsgJX"
-                    "M7IHZhciBqc3N1Y2tpdCA9IGpzcyArICI7ICIgKyBkb2N1bWVudC5jb29raWUudG9TdHJpbmcoKTs_"
-                    ) %(self.base_url, res.content.replace('=/";', '=/";jss=document.cookie.toString();'))
+                    "dmFyIGpzc3Vja2l0ID0gW107IHZhciB3aW5kb3cgPSB0aGlzOyB0aGlz"
+                    "LmRvY3VtZW50ID0ge307IHRoaXMubG9jYXRpb24gPSAiJXMiOyAlczs_"
+                    ) %(self.base_url, tok)
                 ctx = JSEngine.compile(d)
                 t = ctx.exec_('return jssuckit')
-            [c.update({k:v}) for (k,v) in Regex(r'(\w+)\=([^\;]+)').findall(t) if (k != 'expires') and (k != 'path')]
+            for cook in t:
+                for (k, v) in Regex(r'(\w+)\=([^\;]+)').findall(cook):
+                    if (k == 'expires') or (k == 'path'):
+                        continue
+                    elif (k in c) and (v in c.values()):
+                        continue
+                    c.update({k:v})
             return '; '.join([ '{}={}'.format(k,c[k]) for k in c.keys() ])
         except:
             Log.Exception("* <network.Request[error]>: Cannot handle token cookie >>>")
