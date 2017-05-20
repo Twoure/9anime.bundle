@@ -126,12 +126,12 @@ class networking(object):
                     raise ValueError("JSFDecoder: No JSF code found")
             except Exception as e:
                 Log.Debug('JSFDecoder failed, falling back to exejs >>> {}'.format(e))
-                tok = Regex(r'((\w\[\w\])\=[^\;]+\;)').sub(r'\1jssuckit.push(\2);', res.content)
+                tok = Regex(ur'(?u)((\w\[\w\])\=.+?\w\))').sub(ur'\1,jssuckit.push(\2)', res.content.decode('utf-8'))
                 d = D(
                     "dmFyIGpzc3Vja2l0ID0gW107IHZhciB3aW5kb3cgPSB0aGlzOyB0aGlz"
                     "LmRvY3VtZW50ID0ge307IHRoaXMubG9jYXRpb24gPSAiJXMiOyAlczs_"
                     ) %(self.base_url, tok)
-                ctx = JSEngine.compile(d)
+                ctx = JSEngine.compile(d.encode('utf-8'))
                 t = ctx.exec_('return jssuckit')
             for cook in t:
                 for (k, v) in Regex(r'(\w+)\=([^\;]+)').findall(cook):
