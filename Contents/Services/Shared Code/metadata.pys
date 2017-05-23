@@ -154,10 +154,17 @@ class Metadata(object):
 
     def format_episode(self, sea, epn, ser, comment, href):
         if comment.isdigit():
-            title = u'S{}E{}'.format(sea,epn)
+            title = u'S{} \u00B7 E{}'.format(sea, epn)
         else:
-            title = u'S{}E{} | {}'.format(sea, epn, comment)
-        Log(u"* found for S{}E{} on server {}".format(sea, epn, ser))
+            if Regex(r'^\d+ +?\w+').match(comment):
+                Log('found comment regex')
+                comment = comment.split(' ', 1)[1]
+            Log("'{}'".format(comment))
+            comment = 'Uncensored' if comment.lower().strip().startswith('uncen') else comment
+            if (comment == 'Uncensored') or (comment == 'Preview'):
+                sea = 0
+            title = u'S{} \u00B7 E{} | {}'.format(sea, epn, comment)
+        Log(u"* Found S{} \u00B7 E{} on server {}".format(sea, epn, ser))
         return {
             'title': title, 'epn': epn, 'season': sea,
             'server': ser, 'href': href
@@ -171,14 +178,17 @@ class Metadata(object):
                 if not active and (sea_num != sea):
                     continue
                 for enode in self.episodes(sea, ser):
-                    comment = enode.get('data-comment')
+                    #comment = enode.get('data-comment')
+                    comment = enode.text.strip()
                     epn = enode.get('data-base')
                     href = enode.get('href')
                     data_id = enode.get('data-id')
-                    if active and ((enode.get('class') == 'active') or data_id == self.data_id):
+                    if (active and (enode.get('class') == 'active')) or (data_id == self.data_id):
                         return self.format_episode(sea, epn, ser, comment, href)
-                    elif (active == False) and (ep_num == int(epn)):
+                    elif (active == False) and (int(ep_num) == int(epn)):
                         return self.format_episode(sea_num, epn, ser, comment, href)
+                    else:
+                        Log.Warn(u"* S{}|E{}, Server {}, comment '{}', href='{}', sid='{}'".format(sea_num, epn, ser, comment, href, self.data_id))
         return dict()
 
     def init_servers(self):
@@ -191,7 +201,7 @@ class Metadata(object):
                 continue
 
             for season in s.xpath('.//ul[@data-range-id]'):
-                season_number = int(season.get('data-range-id'))
+                season_number = int(season.get('data-range-id'))+1
                 season_dict = {season_number: season.xpath('./li/a')}
 
             self.server_list.append({
