@@ -7,8 +7,6 @@ import common as Common
 from network import Network
 from metadata import Metadata
 
-from lxml import html as HTML
-
 RE_NORM = Regex(r'(https?://(?:www\.)?\w+\.\w+)/watch/.+\.(\w+)/(\w+)')
 SERVER_DICT = {'9anime.1': 1, '9anime.2': 2, 'Openload': 3}
 
@@ -86,51 +84,66 @@ def PlayVideo(url, res='720', **kwargs):
     http_headers = {'Referer': url, 'User-Agent': Common.USER_AGENT}
 
     # token handler
-    http_headers['Cookie'] = Network.get_cookies()
+    cookies = Network.get_cookies()
+    if not cookies:
+        for u in [data_url, base_url, url]:
+            Network.unCache(u)
+        cookies = Network.get_cookies()
+    if not cookies:
+        Log.Error(u"* Cannot handle cookies for {}.  Contact Twoure with logs.".format(data_url))
+        raise Ex.MediaNotAvailable
+
+    http_headers['Cookie'] = cookies
     Log("* 9anime Cookies for {}\n{}".format(url, http_headers['Cookie']))
 
     # grabber handler
     resp = Network.Request(data_url, http_headers)
     data = resp.json()
+    if ('error' in data.keys()) and data['error']:
+        Log.Error(u"* 9anime Grabber Error: {}".format(data['error']))
+        raise Ex.MediaNotAvailable
     grabber = clean_url(data['grabber'] + '?' + urlencode(data['params']))
 
     # streams handler
     resp = Network.Request(grabber, http_headers)
     streams = resp.json()
+    if ('error' in streams.keys()) and streams['error']:
+        Log.Error(u"* 9anime Video Error: {}".format(streams['error']))
+        raise Ex.MediaNotAvailable
     vurls = [{'label': int(s['label'][:-1]), 'file': s['file']} for s in streams['data'] if s['type'] == 'mp4']
     Log.Debug("* 9anime Video Sources: {}".format(vurls))
 
     # Mark watched
-    if Prefs['Login']:
+    if Prefs['login']:
         values = {
-            'username': Prefs['Username'],
-            'password': Prefs['Password'],
+            'username': Prefs['username'],
+            'password': Prefs['password'],
             'remember': '1'
-        }
-        page = Network.Request(base_url + '/user/login', values= values, method = 'POST')
-        cookies = Network.get_cookies_page(page)
-        page = Network.Request(base_url + '/user/ajax/playing', values= {"data[" + sid + "]":vid}, headers = {'referer': url, 'cookie': cookies}, method = 'POST')
-        Network.unCache(base_url + '/user/ajax/playing')
-        
-        if Prefs['ListSwitching']:
-            page = Network.Request(url.rsplit("/",1)[0])
-            page_data = HTML.fromstring(page.text)
-            next_episode_number = int(page_data.xpath('//div[@id="servers"]//a[@href="' + url.split(".to",1)[1] + '"]')[0].get('data-base')) + 1
+            }
+        res = Network.Request(base_url+'/user/login', values=values, method='POST')
+        http_headers['Cookie'] = Network.cookies_from_res(res)
+
+        Network.Request(base_url+'/user/ajax/playing', values={"data[%s]" %sid: vid}, headers=http_headers)
+        Network.unCache(base_url+'/user/ajax/playing')
+
+        if Prefs['lswitch']:
+            html = Network.ElementFromURL(url.rsplit("/",1)[0])
+            next_episode_number = int(html.xpath('//div[@id="servers"]//a[@href="%s"]' %url.split(".to",1)[1])[0].get('data-base')) + 1
             Log("next episode number: {}".format(next_episode_number))
             try:
-                page_data.xpath("//div[@id='servers']/div[@class='server row'][1]//li/a[@data-base='" + str(next_episode_number) + "']/@href")[0]
+                html.xpath("//div[@id='servers']/div[@class='server row'][1]//li/a[@data-base='%s']/@href" %str(next_episode_number))[0]
                 Log("next episode available")
-                Network.unCache(base_url + "/user/ajax/edit-watchlist?folder=watching&id=" + sid + "&R=1")
-                Network.Request(base_url + "/user/ajax/edit-watchlist?folder=watching&id=" + sid + "&R=1", headers = {'referer': url, 'cookie': cookies})
+                Network.unCache(base_url + "/user/ajax/edit-watchlist?folder=watching&id=%s&R=1" %sid)
+                Network.Request(base_url + "/user/ajax/edit-watchlist?folder=watching&id=%s&R=1" %sid, headers=http_headers)
             except:
-                status = page_data.xpath("//dl[@class='meta col-sm-12'][1]/dd[6]/text()")[0].strip()
+                status = html.xpath("//dl[@class='meta col-sm-12'][1]/dd[6]/text()")[0].strip()
                 Log("no next episode")
-                if status == "Airing":
-                    Network.unCache(base_url + "/user/ajax/edit-watchlist?folder=watching&id=" + sid + "&R=1")
-                    Network.Request(base_url + "/user/ajax/edit-watchlist?folder=watching&id=" + sid + "&R=1", headers = {'referer': url, 'cookie': cookies})
+                if (status.lower() == "airing"):
+                    Network.unCache(base_url + "/user/ajax/edit-watchlist?folder=watching&id=%s&R=1" %sid)
+                    Network.Request(base_url + "/user/ajax/edit-watchlist?folder=watching&id=%s&R=1" %sid, headers=http_headers)
                 else:
-                    Network.unCache(base_url + "/user/ajax/edit-watchlist?folder=watched&id=" + sid + "&R=1")
-                    Network.Request(base_url + "/user/ajax/edit-watchlist?folder=watched&id=" + sid + "&R=1", headers = {'referer': url, 'cookie': cookies})
+                    Network.unCache(base_url + "/user/ajax/edit-watchlist?folder=watched&id=%s&R=1" %sid)
+                    Network.Request(base_url + "/user/ajax/edit-watchlist?folder=watched&id=%s&R=1" %sid, headers=http_headers)
 
     vurl = None
     for s in Util.ListSortedByKey(vurls, 'label'):

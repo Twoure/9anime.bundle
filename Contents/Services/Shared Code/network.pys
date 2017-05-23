@@ -63,6 +63,8 @@ class networking(object):
     def HTTPRequest(self, url, hname, headers=None, cacheTime=None, values=None, follow_redirects=True, method='GET', verify=True, count=0):
         if not headers:
             headers = {'Referer': url, 'User-Agent': self.user_agent}
+        if not 'User-Agent' in headers.keys():
+            headers['User-Agent'] = self.user_agent
 
         nc = headers.get('Cookie', None)
         cookies = dict((k,v) for (k,v) in Regex(r'(\w+)\=([^\;]+)').findall(nc)) if nc else {}
@@ -113,8 +115,9 @@ class networking(object):
 
     def get_cookies(self):
         headers = {'Referer': self.base_url, 'User-Agent': self.user_agent}
+        tok_url = self.base_url+'/token'
         try:
-            res = self.Request(self.base_url+'/token', headers)
+            res = self.Request(tok_url, headers)
             c = dict()
             for cs in [ v.split(';')[0] for v in res.headers.values() if v.startswith('__cfduid') ]:
                 kk,vv = cs.split('=')
@@ -126,13 +129,23 @@ class networking(object):
                     raise ValueError("JSFDecoder: No JSF code found")
             except Exception as e:
                 Log.Debug('JSFDecoder failed, falling back to exejs >>> {}'.format(e))
-                tok = Regex(ur'(?u)((\w\[\w\])\=.+?\w\))').sub(ur'\1,jssuckit.push(\2)', res.content.decode('utf-8'))
-                d = D(
-                    "dmFyIGpzc3Vja2l0ID0gW107IHZhciB3aW5kb3cgPSB0aGlzOyB0aGlz"
-                    "LmRvY3VtZW50ID0ge307IHRoaXMubG9jYXRpb24gPSAiJXMiOyAlczs_"
-                    ) %(self.base_url, tok)
-                ctx = JSEngine.compile(d.encode('utf-8'))
-                t = ctx.exec_('return jssuckit')
+                try:
+                    tok = res.content.decode('utf-8')
+                    sep = Regex(ur'(?u)\S\[\S\]\=.+?\(\S\)([\,\;])').search(tok).group(1)
+                    tok = Regex(ur'(?u)((\S\[\S\])\=.+?\(\S\))').sub(ur'\1%sjssuckit.push(\2)' %sep, tok)
+                    def re_rep(string, search, rep):
+                        return string.replace(search, rep)
+                    tok = Regex(ur'(?u)jssuckit\.push\((.+?)\)').sub( lambda m: re_rep(tok, m.group(1), 'document["cookie"]'), tok)
+                    d = D(
+                        "dmFyIGpzc3Vja2l0ID0gW107IHZhciB3aW5kb3cgPSB0aGlzOyB0aGlz"
+                        "LmRvY3VtZW50ID0ge307IHRoaXMubG9jYXRpb24gPSAiJXMiOyAlczs_"
+                        ) %(self.base_url, tok)
+                    ctx = JSEngine.compile(d.encode('utf-8'))
+                    t = ctx.exec_('return jssuckit')
+                except Exception as e:
+                    Log.Exception("JRE Failed: Clear cache and try again. >>>")
+                    self.unCache(tok_url)
+                    return ''
             for cook in t:
                 for (k, v) in Regex(r'(\w+)\=([^\;]+)').findall(cook):
                     if (k == 'expires') or (k == 'path'):
@@ -145,15 +158,10 @@ class networking(object):
             Log.Exception("* <network.Request[error]>: Cannot handle token cookie >>>")
         return ''
 
-    def get_cookies_page(self, page):
-        cookies = page.cookies
-        c = list()
-        for each in cookies:
-            c.append(str(each).split('Cookie ')[1].rsplit(' for ')[0])
-        return '; '.join(c)
-	
+    def cookies_from_res(self, res):
+        return '; '.join([ s.split('Cookie ')[1].rsplit(' for ')[0] for s in res.cookies if ('Cookie ' in s) ])
+
     def unCache(self, url):
-        hn = Hash.MD5(url)
-        Data.Remove(Data.HTTP(hn))		
+        Data.Remove(Data.HTTP(Hash.MD5(url)))
 
 Network = networking()
