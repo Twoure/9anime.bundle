@@ -120,8 +120,8 @@ def PlayVideo(url, res='720', **kwargs):
             'password': Prefs['password'],
             'remember': '1'
             }
-        res = Network.Request(base_url+'/user/login', values=values, method='POST')
-        http_headers['Cookie'] = Network.cookies_from_res(res)
+        resp = Network.Request(base_url+'/user/login', values=values, method='POST')
+        http_headers['Cookie'] = Network.cookies_from_res(resp)
 
         Network.Request(base_url+'/user/ajax/playing', values={"data[%s]" %sid: vid}, headers=http_headers)
         Network.unCache(base_url+'/user/ajax/playing')
@@ -129,15 +129,12 @@ def PlayVideo(url, res='720', **kwargs):
         if Prefs['lswitch']:
             html = Network.ElementFromURL(url.rsplit("/",1)[0])
             next_episode_number = int(html.xpath('//div[@id="servers"]//a[@href="%s"]' %url.split(".to",1)[1])[0].get('data-base')) + 1
-            Log("next episode number: {}".format(next_episode_number))
             try:
                 html.xpath("//div[@id='servers']/div[@class='server row'][1]//li/a[@data-base='%s']/@href" %str(next_episode_number))[0]
-                Log("next episode available")
                 Network.unCache(base_url + "/user/ajax/edit-watchlist?folder=watching&id=%s&R=1" %sid)
                 Network.Request(base_url + "/user/ajax/edit-watchlist?folder=watching&id=%s&R=1" %sid, headers=http_headers)
             except:
                 status = html.xpath("//dl[@class='meta col-sm-12'][1]/dd[6]/text()")[0].strip()
-                Log("no next episode")
                 if (status.lower() == "airing"):
                     Network.unCache(base_url + "/user/ajax/edit-watchlist?folder=watching&id=%s&R=1" %sid)
                     Network.Request(base_url + "/user/ajax/edit-watchlist?folder=watching&id=%s&R=1" %sid, headers=http_headers)

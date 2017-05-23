@@ -293,9 +293,7 @@ def OnDeck(title, cookies):
 
             try:
                 max_episode_number = each.xpath("./div[@class='info']/span[@class='status']/text()")[0]
-                #Log(max_episode_number)
                 max_episode_number = int(Regex(r'\D*(\d+).*\/').search(max_episode_number).group(1))
-                #Log(max_episode_number)
                 episode_number = None if (episode_number > max_episode_number) else episode_number
             except:
                 episode_number = 1
