@@ -2,10 +2,10 @@
 
 """9anime.to Service Code"""
 
-from urllib import urlencode
 import common as Common
 from network import Network
 from metadata import Metadata
+from openload import OpenloadStreamFromURL
 
 RE_NORM = Regex(r'(https?://(?:www\.)?\w+\.\w+)/watch/.+\.(\w+)/(\w+)')
 SERVER_DICT = {'9anime.1': 1, '9anime.2': 2, 'Openload': 3}
@@ -33,7 +33,7 @@ def MetadataObjectForURL(url):
             art=Resource.ContentsOfURLWithFallback([meta.art, meta.art_fallback]),
             summary=meta.summary
             )
-    ep = meta.episode(ser_num=SERVER_DICT[Prefs['server']])
+    ep = corrected_epinfo_dict(meta)
     Log("* ep_dict = {}".format(ep))
     return EpisodeObject(
         title=ep['title'] if ep else meta.show_name,
@@ -72,6 +72,12 @@ def MediaObjectsForURL(url):
 @indirect
 def PlayVideo(url, res='720', **kwargs):
 
+    vurl = None
+    meta = Metadata(url)
+    if meta.kind_simple != 'Movie':
+        ep = corrected_epinfo_dict(meta)
+        url = Common.BASE_URL + ep['href']
+
     r = RE_NORM.search(url)
     if not r:
         raise Ex.MediaNotAvailable
@@ -102,16 +108,21 @@ def PlayVideo(url, res='720', **kwargs):
     if ('error' in data.keys()) and data['error']:
         Log.Error(u"* 9anime Grabber Error: {}".format(data['error']))
         raise Ex.MediaNotAvailable
-    grabber = clean_url(data['grabber'] + '?' + urlencode(data['params']))
-
-    # streams handler
-    resp = Network.Request(grabber, http_headers)
-    streams = resp.json()
-    if ('error' in streams.keys()) and streams['error']:
-        Log.Error(u"* 9anime Video Error: {}".format(streams['error']))
-        raise Ex.MediaNotAvailable
-    vurls = [{'label': int(s['label'][:-1]), 'file': s['file']} for s in streams['data'] if s['type'] == 'mp4']
-    Log.Debug("* 9anime Video Sources: {}".format(vurls))
+    Log(data)
+    if (Prefs['server'] == 'Openload') and (data['target']):
+        vurls = list()
+        vurl = openload_stream(data['target'])
+        q = 'Openload'
+    else:
+        grabber = clean_url(Network.AddParamsToURL(data['grabber'], data['params']))
+        # streams handler
+        resp = Network.Request(grabber, http_headers)
+        streams = resp.json()
+        if ('error' in streams.keys()) and streams['error']:
+            Log.Error(u"* 9anime Video Error: {}".format(streams['error']))
+            raise Ex.MediaNotAvailable
+        vurls = [{'label': int(s['label'][:-1]), 'file': s['file']} for s in streams['data'] if s['type'] == 'mp4']
+        Log.Debug("* 9anime Video Sources: {}".format(vurls))
 
     # Mark watched
     if Prefs['login']:
@@ -142,20 +153,51 @@ def PlayVideo(url, res='720', **kwargs):
                     Network.unCache(base_url + "/user/ajax/edit-watchlist?folder=watched&id=%s&R=1" %sid)
                     Network.Request(base_url + "/user/ajax/edit-watchlist?folder=watched&id=%s&R=1" %sid, headers=http_headers)
 
-    vurl = None
-    for s in Util.ListSortedByKey(vurls, 'label'):
-        vurl = s['file']
-        q = s['label']
-        if s['label'] == int(res):
-            break
-        elif s['label'] > int(res):
-            break
+    if vurls:
+        for s in Util.ListSortedByKey(vurls, 'label'):
+            vurl = s['file']
+            q = s['label']
+            if s['label'] == int(res):
+                break
+            elif s['label'] > int(res):
+                break
 
     if vurl:
         Log.Debug('* PlayVideo URL = {} | {}'.format(q, vurl))
         return IndirectResponse(VideoClipObject, key=vurl)
 
     raise Ex.MediaNotAvailable
+
+####################################################################################################
+def openload_stream(url):
+    Log("* Find Openload Stream from '{}'".format(url))
+    headers = {'User-Agent': Common.USER_AGENT, 'Referer': url}
+    ourl = OpenloadStreamFromURL(url, headers)
+    if not ourl:
+        Log.Warn("* Cannot handle Openload stream from {}".format(url))
+        return
+
+    vurl = None
+    try:
+        HTTP.Request(ourl, headers=headers, follow_redirects=False, method='HEAD').load()
+        vurl = ourl
+    except Ex.RedirectError as e:
+        if 'Location' in e.headers:
+            vurl = e.headers['Location']
+        elif 'location' in e.headers:
+            vurl = e.headers['location']
+    return vurl
+
+####################################################################################################
+def corrected_epinfo_dict(meta):
+    epr = meta.episode(active=True)
+    active = SERVER_DICT[Prefs['server']] == int(epr['server'])
+    sea_num = epr['season']
+
+    return meta.episode(
+        ep_num=epr['epn'], sea_num=sea_num,
+        ser_num=SERVER_DICT[Prefs['server']], active=active
+        )
 
 ####################################################################################################
 def clean_url(url):

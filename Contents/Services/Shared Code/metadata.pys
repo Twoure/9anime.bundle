@@ -167,14 +167,17 @@ class Metadata(object):
         Log(u"* Found S{} \u00B7 E{} on server {}".format(sea, epn, ser))
         return {
             'title': title, 'epn': epn, 'season': sea,
-            'server': ser, 'href': href
+            'server': ser, 'href': href, 'vid': href.rsplit('/')[-1]
             }
 
 
     def episode(self, ep_num=1, sea_num=0, ser_num=1, active=True):
+        Log("* looking for S{}E{} on Server{}, active?={}".format(sea_num, ep_num, ser_num, active))
         ser_pri = [ser_num] + list(set([1,2,3]) - set([ser_num]))
         for ser in ser_pri:
-            for sea in sorted(self.seasons(ser).keys()):
+            #for sea in sorted(self.seasons(ser).keys()):
+            for sea in sorted(self.seasons(ser)):
+                Log(sea)
                 if not active and (sea_num != sea):
                     continue
                 for enode in self.episodes(sea, ser):

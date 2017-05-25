@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 
 from __builtin__ import getattr, hasattr
+from urllib import urlencode
+import urlparse
 from data import Data
 import common as Common
 from nineanime.jsfdecoder import JSFDecoder
@@ -163,5 +165,12 @@ class networking(object):
 
     def unCache(self, url):
         Data.Remove(Data.HTTP(Hash.MD5(url)))
+
+    def AddParamsToURL(self, url, params=dict):
+        parts = urlparse.urlparse(url)
+        query = dict(urlparse.parse_qsl(parts.query) + params.items())
+        parts = list(parts)
+        parts[4] = urlencode(query)
+        return urlparse.urlunparse(parts)
 
 Network = networking()
