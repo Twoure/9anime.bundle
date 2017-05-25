@@ -287,9 +287,9 @@ def OnDeck(title, cookies):
 
     for each in html.xpath("//div[@data-name='watching']/div[@class='links']/div"):
         try:
-            episode_number = int(each.xpath("./div[@class='link']/span[@class='current']/text()")[0]) + 1
             show_url = each.xpath("./div/a/@href")[0].rsplit("?",1)[0]
             title = show_url.split("watch/",1)[1].split(".",1)[0].replace("-"," ")
+            episode_number = int(each.xpath("./div[@class='link']/span[@class='current']/text()")[0]) + 1
 
             try:
                 max_episode_number = each.xpath("./div[@class='info']/span[@class='status']/text()")[0]
