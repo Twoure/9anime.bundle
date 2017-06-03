@@ -10,7 +10,7 @@ from DumbTools import DumbKeyboard, DumbPrefs
 # setup global variables
 TITLE                       = Common.TITLE
 PREFIX                      = Common.PREFIX
-BASE_URL                    = Common.BASE_URL
+#BASE_URL                    = Common.BASE_URL
 GIT_REPO                    = 'Twoure/{}.bundle'.format(TITLE)
 
 # setup Updater and inital run info
@@ -110,7 +110,7 @@ def MainMenu():
             'password': Prefs['password'],
             'remember': '1'
             }
-        ul_url = BASE_URL + '/user/login'
+        ul_url = Prefs['domain'] + '/user/login'
         Network.unCache(ul_url)
         cookies = Network.cookies_from_res(Network.Request(ul_url, values=values))
 
@@ -154,8 +154,9 @@ def ValidatePrefs():
 def Watchlist(title, cookies):
     oc = ObjectContainer(title2=title)
 
-    headers = {'Referer': BASE_URL, 'Cookie': cookies}
-    html = Network.ElementFromURL(BASE_URL + '/user/watchlist', headers=headers)
+    base_url = Prefs['domain']
+    headers = {'Referer': base_url, 'Cookie': cookies}
+    html = Network.ElementFromURL(base_url + '/user/watchlist', headers=headers)
     for each in html.xpath("//div[@class='tabs']/a"):
         tab = each.xpath("./@data-name")[0]
         title = each.xpath("./text()")[0]
@@ -173,13 +174,14 @@ def Watchlist(title, cookies):
 def WatchlistTab(title, href, cookies):
     oc = ObjectContainer(title2=title)
 
-    Network.unCache(BASE_URL + href)
-    headers = {'Referer': BASE_URL, 'Cookie': cookies}
-    html = Network.ElementFromURL(BASE_URL + href, headers=headers)
+    base_url = Prefs['domain']
+    Network.unCache(base_url + href)
+    headers = {'Referer': base_url, 'Cookie': cookies}
+    html = Network.ElementFromURL(base_url + href, headers=headers)
 
     tab = href.split("folder=",1)[1].split("&",1)[0]
     for each in html.xpath("//div[@data-name='%s']/div[@class='links']/div" %tab):
-        url = BASE_URL + each.xpath("./div/a/@href")[0]
+        url = base_url + each.xpath("./div/a/@href")[0]
 
         title_show = url.split("watch/",1)[1].split(".",1)[0].replace("-"," ")
 
@@ -206,7 +208,7 @@ def WatchlistTab(title, href, cookies):
             paging = paging.xpath('./a')[0]
             nhref = paging.get('href')
     except Exception as e:
-        Log.Warn(u"* Warning, no content for '{}' >>>\n{}".format(BASE_URL + href, e))
+        Log.Warn(u"* Warning, no content for '{}' >>>\n{}".format(base_url + href, e))
         nhref = None
 
     if nhref:
@@ -229,8 +231,9 @@ def Random(title, tab, cookies):
 
     oc = ObjectContainer(title2=title)
 
-    headers = {'Referer': BASE_URL, 'Cookie': cookies}
-    html = Network.ElementFromURL(BASE_URL + '/user/watchlist', headers=headers)
+    base_url = Prefs['domain']
+    headers = {'Referer': base_url, 'Cookie': cookies}
+    html = Network.ElementFromURL(base_url + '/user/watchlist', headers=headers)
 
     try:
         pages = html.xpath("//div[@data-name='%s']//ul[@class='pagination']//li" %tab)
@@ -241,7 +244,7 @@ def Random(title, tab, cookies):
         paging = paging.xpath('./a')[0]
         href = paging.get('href')
 
-        html = Network.ElementFromURL(BASE_URL + "/" + href, headers=headers)
+        html = Network.ElementFromURL(base_url + "/" + href, headers=headers)
         list_show = html.xpath("//div[@data-name='%s']/div[@class='links']/div" %tab)
         num_show = len(list_show) + (num_pages - 1)*num_per_page
     except:
@@ -254,11 +257,11 @@ def Random(title, tab, cookies):
     page_number = int(random_value/num_per_page) + 1
     wlf_href = "/user/watchlist?folder={0}&{0}-page={1}".format(tab, page_number)
 
-    html = Network.ElementFromURL(BASE_URL + wlf_href, headers=headers)
+    html = Network.ElementFromURL(base_url + wlf_href, headers=headers)
     list_show = html.xpath("//div[@data-name='%s']/div[@class='links']/div" %tab)
 
     random_value = random_value - num_per_page*(page_number - 1)
-    url = BASE_URL + list_show[random_value].xpath("./div/a/@href")[0]
+    url = base_url + list_show[random_value].xpath("./div/a/@href")[0]
 
     title_show = url.split("watch/",1)[1].split(".",1)[0].replace("-"," ")
 
@@ -279,8 +282,9 @@ def OnDeck(title, cookies):
 
     oc = ObjectContainer(title2=title)
 
-    wl_url = BASE_URL + '/user/watchlist'
-    headers = {'Referer': BASE_URL, 'Cookie': cookies}
+    base_url = Prefs['domain']
+    wl_url = base_url + '/user/watchlist'
+    headers = {'Referer': base_url, 'Cookie': cookies}
 
     Network.unCache(wl_url)
     html = Network.ElementFromURL(wl_url, headers=headers)
@@ -302,7 +306,7 @@ def OnDeck(title, cookies):
             episode_number = 1
 
         if episode_number:
-            html = Network.ElementFromURL(BASE_URL+show_url)
+            html = Network.ElementFromURL(base_url + show_url)
 
             dt = [d.strip() for d in html.xpath('//dt[text()="Type:"]/following-sibling::dd/text()') if (d.strip() != ',') and (d.strip() != '')]
             kind = dt[0] if dt else None
@@ -331,7 +335,7 @@ def OnDeck(title, cookies):
                     title=etitle,
                     thumb=thumb,
                     source_title='9anime',
-                    url=href if href.startswith(BASE_URL) else BASE_URL + href
+                    url=href if href.startswith(base_url) else base_url + href
                     ))
             else:
                 if kind:
@@ -346,7 +350,7 @@ def OnDeck(title, cookies):
                     season=season,
                     thumb=thumb,
                     source_title='9anime',
-                    url=href if href.startswith(BASE_URL) else BASE_URL + href
+                    url=href if href.startswith(base_url) else base_url + href
                     ))
 
     return oc
@@ -356,17 +360,18 @@ def OnDeck(title, cookies):
 def SubMenu(title, href):
     oc = ObjectContainer(title2=title)
 
-    headers = {'Referer': BASE_URL, 'User-Agent': Common.USER_AGENT}
+    base_url = Prefs['domain']
+    headers = {'Referer': base_url, 'User-Agent': Common.USER_AGENT}
     if 'search?' in href:
         cookies = Network.get_cookies()
         if not cookies:
-            cookies = Network.unCache(BASE_URL)
+            cookies = Network.unCache(base_url)
         if not cookies:
             oc.header = "Error"
             oc.message = u"{} Cookie Cache Error".format(title)
             return oc
         headers.update({'Cookie': cookies})
-    html = Network.ElementFromURL(BASE_URL + href, headers=headers)
+    html = Network.ElementFromURL(base_url + href, headers=headers)
 
     for ci in html.xpath('//div[@class="item"]'):
         img_node = ci.xpath('.//img')[0]
@@ -386,7 +391,7 @@ def SubMenu(title, href):
         paging = html.xpath('//div[@class="paging"]/a')[1]
         nhref = paging.get('href')
     except Exception as e:
-        Log.Warn(u"* Warning, no content for '{}' >>>\n{}".format(BASE_URL + href, e))
+        Log.Warn(u"* Warning, no content for '{}' >>>\n{}".format(base_url + href, e))
         nhref = None
 
     if nhref:
@@ -415,7 +420,8 @@ def SubMenu(title, href):
 def ShowMenu(title, thumb, url, cookies=None):
     oc = ObjectContainer(title2=title)
 
-    headers={'Referer': BASE_URL, 'Cookie': cookies} if cookies else None
+    base_url = Prefs['domain']
+    headers={'Referer': base_url, 'Cookie': cookies} if cookies else None
     html = Network.ElementFromURL(url, headers=headers)
 
     dt = [d.strip() for d in html.xpath('//dt[text()="Type:"]/following-sibling::dd/text()') if (d.strip() != ',') and (d.strip() != '')]
@@ -442,7 +448,7 @@ def ShowMenu(title, thumb, url, cookies=None):
                 title=etitle,
                 thumb=thumb,
                 source_title='9anime',
-                url=href if href.startswith(BASE_URL) else BASE_URL + href
+                url=href if href.startswith(base_url) else base_url + href
                 ))
         else:
             if kind:
@@ -457,7 +463,7 @@ def ShowMenu(title, thumb, url, cookies=None):
                 season=season,
                 thumb=thumb,
                 source_title='9anime',
-                url=href if href.startswith(BASE_URL) else BASE_URL + href
+                url=href if href.startswith(base_url) else base_url + href
                 ))
 
     return oc

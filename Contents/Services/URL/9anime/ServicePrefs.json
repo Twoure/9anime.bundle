@@ -1,5 +1,12 @@
 [
   {
+    "id": "domain",
+    "label": "Domain",
+    "type": "enum",
+    "values": ["https://9anime.to", "https://9anime.is"],
+    "default": "https://9anime.to"
+  },
+  {
     "id": "update_channel",
     "label": "Update Channel",
     "type": "enum",

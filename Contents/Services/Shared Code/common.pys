@@ -7,11 +7,17 @@ import os, sys
 # general constants
 TITLE = '9anime'
 PREFIX = '/video/' + TITLE
-BASE_URL = 'https://{}.to'.format(TITLE)
+#BASE_URL = 'https://{}.to'.format(TITLE)
 LIST_VIEW_CLIENTS = ['Android', 'iOS']
 CACHE_TIME = Datetime.Delta(hours=1)
 #CACHE_TIME = Datetime.Delta()  # no cacheTime, for debugging
-#USER_AGENT = "Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.81 Mobile Safari/537.36"
+"""
+USER_AGENT_MOBILE = (
+    "Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/58.0.3029.81 Mobile Safari/537.36"
+    )
+"""
 USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.96 Safari/537.36"
 
 # setup libraries context

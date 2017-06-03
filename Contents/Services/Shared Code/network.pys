@@ -13,7 +13,6 @@ import os
 
 class networking(object):
     def __init__(self):
-        self.base_url = Common.BASE_URL
         self.user_agent = Common.USER_AGENT
         self.cache_time = Common.CACHE_TIME
         self.url_cache_dir = Data.url_cache_dir
@@ -24,6 +23,10 @@ class networking(object):
 
     def dir_exists(self, path):
         return os.path.exists(path) and os.path.isdir(path)
+
+    @property
+    def base_url(self):
+        return Prefs['domain']
 
     @property
     def file_list(self):

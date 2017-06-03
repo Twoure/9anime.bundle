@@ -74,7 +74,7 @@ def PlayVideo(url, res='720', **kwargs):
     meta = Metadata(url)
     if meta.kind_simple != 'Movie':
         ep = meta.cepinfo_dict()
-        url = Common.BASE_URL + ep['href']
+        url = Prefs['domain'] + ep['href']
 
     r = RE_NORM.search(url)
     if not r:
@@ -191,5 +191,5 @@ def clean_url(url):
     if url.startswith('//'):
         url = 'https:' + url
     elif url.startswith('/'):
-        url = Common.BASE_URL + url
+        url = Prefs['domain'] + url
     return url
