@@ -8,7 +8,6 @@ from metadata import Metadata
 from openload import OpenloadStreamFromURL
 
 RE_NORM = Regex(r'(https?://(?:www\.)?\w+\.\w+)/watch/.+\.(\w+)/(\w+)')
-SERVER_DICT = {'9anime.1': 1, '9anime.2': 2, 'Openload': 3}
 
 ####################################################################################################
 def NormalizeURL(url):
@@ -33,8 +32,7 @@ def MetadataObjectForURL(url):
             art=Resource.ContentsOfURLWithFallback([meta.art, meta.art_fallback]),
             summary=meta.summary
             )
-    ep = corrected_epinfo_dict(meta)
-    Log("* ep_dict = {}".format(ep))
+    ep = meta.cepinfo_dict()
     return EpisodeObject(
         title=ep['title'] if ep else meta.show_name,
         show=meta.show_name,
@@ -75,7 +73,7 @@ def PlayVideo(url, res='720', **kwargs):
     vurl = None
     meta = Metadata(url)
     if meta.kind_simple != 'Movie':
-        ep = corrected_epinfo_dict(meta)
+        ep = meta.cepinfo_dict()
         url = Common.BASE_URL + ep['href']
 
     r = RE_NORM.search(url)
@@ -187,17 +185,6 @@ def openload_stream(url):
         elif 'location' in e.headers:
             vurl = e.headers['location']
     return vurl
-
-####################################################################################################
-def corrected_epinfo_dict(meta):
-    epr = meta.episode(active=True)
-    active = SERVER_DICT[Prefs['server']] == int(epr['server'])
-    sea_num = epr['season']
-
-    return meta.episode(
-        ep_num=epr['epn'], sea_num=sea_num,
-        ser_num=SERVER_DICT[Prefs['server']], active=active
-        )
 
 ####################################################################################################
 def clean_url(url):

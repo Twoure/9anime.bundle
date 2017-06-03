@@ -19,6 +19,8 @@ class Metadata(object):
         self.art_fallback = 'http://i.imgur.com/8LmKZl2.jpg'
         self.re_norm = Regex(r'(https?://(?:www\.)?\w+\.\w+)/watch/[^/]+/(\w+)')
         self.re_dur = Regex(r'(\d+) *?(h|min|sec)')
+        self.re_comment = Regex(r'^\d+ +?(\w+.*)')
+        self.re_serv = Regex(r'(\d+)')
         self.server_list = list()
         self.init_servers()
 
@@ -134,11 +136,11 @@ class Metadata(object):
         return self.html.xpath('//dt[text()="Genre:"]/following-sibling::dd/a/text()')
 
     def i_for_name(self, name):
-        if '1' in name:
-            return 1
-        elif '2' in name:
-            return 2
-        return 3
+        if self.re_serv.search(name):
+            return int(self.re_serv.search(name).group(1))
+        elif 'openload' in name.lower().strip():
+            return (0)
+        return (-1)
 
     def seasons(self, server=1):
         for sld in self.server_list:
@@ -148,50 +150,55 @@ class Metadata(object):
 
     def episodes(self, season_number=0, server_number=1):
         seasons = self.seasons(server_number)
-        if seasons:
+        if season_number in seasons.keys():
             return seasons[season_number]
         return list()
+
+    def clean_comment(self, c):
+        if self.re_comment.match(c):
+            c = self.re_comment.search(c).group(1)
+        if 'uncen' in c.lower():
+            c = 'Uncensored'
+        return c
 
     def format_episode(self, sea, epn, ser, comment, href):
         if comment.isdigit():
             title = u'S{} \u00B7 E{}'.format(sea, epn)
+        elif self.re_serv.match(comment):
+            try:
+                epn = float(comment)
+                title = u'S{} \u00B7 E{}'.format(sea, epn)
+            except:
+                title = u'S{} \u00B7 E{} | {}'.format(sea, epn, self.clean_comment(comment))
         else:
-            if Regex(r'^\d+ +?\w+').match(comment):
-                Log('found comment regex')
-                comment = comment.split(' ', 1)[1]
-            Log("'{}'".format(comment))
-            comment = 'Uncensored' if comment.lower().strip().startswith('uncen') else comment
-            if (comment == 'Uncensored') or (comment == 'Preview'):
-                sea = 0
-            title = u'S{} \u00B7 E{} | {}'.format(sea, epn, comment)
-        Log(u"* Found S{} \u00B7 E{} on server {}".format(sea, epn, ser))
+            title = u'S{} \u00B7 E{} | {}'.format(sea, epn, self.clean_comment(comment))
+        Log(u"* Returning S{}|E{} on Server {}".format(sea, epn, ser))
         return {
             'title': title, 'epn': epn, 'season': sea,
             'server': ser, 'href': href, 'vid': href.rsplit('/')[-1]
             }
 
-
     def episode(self, ep_num=1, sea_num=0, ser_num=1, active=True):
         Log("* looking for S{}E{} on Server{}, active?={}".format(sea_num, ep_num, ser_num, active))
-        ser_pri = [ser_num] + list(set([1,2,3]) - set([ser_num]))
-        for ser in ser_pri:
-            #for sea in sorted(self.seasons(ser).keys()):
+        Log("* server order = {}".format(self.server_pref_order))
+        for ser in self.server_pref_order:
+            if (active == False) and (ser_num != ser):
+                continue
             for sea in sorted(self.seasons(ser)):
-                Log(sea)
-                if not active and (sea_num != sea):
+                Log('* searching for S{} in S{}'.format(sea_num, sea))
+                if (active == False) and (sea_num != sea):
                     continue
                 for enode in self.episodes(sea, ser):
-                    #comment = enode.get('data-comment')
                     comment = enode.text.strip()
                     epn = enode.get('data-base')
                     href = enode.get('href')
                     data_id = enode.get('data-id')
                     if (active and (enode.get('class') == 'active')) or (data_id == self.data_id):
                         return self.format_episode(sea, epn, ser, comment, href)
-                    elif (active == False) and (int(ep_num) == int(epn)):
+                    elif (active == False) and (float(ep_num) == float(epn)):
                         return self.format_episode(sea_num, epn, ser, comment, href)
                     else:
-                        Log.Warn(u"* S{}|E{}, Server {}, comment '{}', href='{}', sid='{}'".format(sea_num, epn, ser, comment, href, self.data_id))
+                        Log.Warn(u"* S{}|E{}, Server {}, comment '{}', href='{}', sid='{}'".format(sea, epn, ser, comment, href, self.data_id))
         return dict()
 
     def init_servers(self):
@@ -203,12 +210,53 @@ class Metadata(object):
             if not name:
                 continue
 
+            specials_list = list()
+            season_dict = dict()
             for season in s.xpath('.//ul[@data-range-id]'):
+                ep_list = list()
                 season_number = int(season.get('data-range-id'))+1
-                season_dict = {season_number: season.xpath('./li/a')}
+                for e in season.xpath('./li/a'):
+                    if self.re_comment.match(e.text.strip()):
+                        specials_list.append(e)
+                    else:
+                        ep_list.append(e)
+                season_dict[season_number] = ep_list
+                if specials_list:
+                    season_dict.update({0: specials_list})
 
             self.server_list.append({
                 'server_number': self.i_for_name(name), 'list_index': i,
                 'name': name, 'seasons': season_dict
                 })
         return
+
+    @property
+    def selected_server(self):
+        for (j, ser) in [(s['list_index'], s['server_number']) for s in Util.ListSortedByKey(self.server_list, 'list_index')]:
+            if (self.i_for_name(Prefs['server']) == 0) and (ser == 0):
+                return (0)
+            elif (self.i_for_name(Prefs['server'][1:]) == j+1):
+                return ser
+        return (-1)
+
+    @property
+    def server_pref_order(self):
+        dlo = [serv['server_number'] for serv in Util.ListSortedByKey(self.server_list, 'list_index')]
+        ss = self.selected_server
+        Log("* Selecting Server = '{}' for {} Server".format(ss, Prefs['server']))
+        if ss in dlo:
+            ssi = dlo.index(ss)
+            return [ss] + dlo[:ssi] + dlo[ssi+1:]
+        return dlo
+
+    def cepinfo_dict(self):
+        epr = self.episode(active=True)
+        Log("* Original ep_dict = {}".format(epr))
+
+        ep = self.episode(
+            ep_num=epr['epn'], sea_num=epr['season'],
+            ser_num=self.selected_server,
+            active=False
+            )
+        Log("* Corrected ep_dict = {}".format(ep))
+        return ep
