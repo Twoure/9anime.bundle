@@ -17,7 +17,7 @@
     "id": "server",
     "label": "Preferred Video Server",
     "type": "enum",
-    "values": ["9anime.1", "9anime.2", "Openload"],
+    "values": ["9anime.1", "9anime.2", "Openload", "MyCloud"],
     "default": "9anime.1"
   },
   {

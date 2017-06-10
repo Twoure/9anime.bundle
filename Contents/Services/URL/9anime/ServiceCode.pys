@@ -8,6 +8,9 @@ from metadata import Metadata
 from openload import OpenloadStreamFromURL
 
 RE_NORM = Regex(r'(https?://(?:www\.)?\w+\.\w+)/watch/.+\.(\w+)/(\w+)')
+RE_HLS = Regex(r'["\']?file["\']? *?\: *?["\']((?:https?)?//[^"\']+\.m3u8.*?)["\']')
+RE_SUB1 =  Regex(r'(?m)(^[^\#])')
+RE_SOURCES = Regex(r'(?m)(^.+?\d+/(\d+).+$)')
 
 ####################################################################################################
 def NormalizeURL(url):
@@ -71,6 +74,7 @@ def MediaObjectsForURL(url):
 def PlayVideo(url, res='720', **kwargs):
 
     vurl = None
+    host = '9anime'
     meta = Metadata(url)
     if meta.kind_simple != 'Movie':
         ep = meta.cepinfo_dict()
@@ -107,11 +111,18 @@ def PlayVideo(url, res='720', **kwargs):
         Log.Error(u"* 9anime Grabber Error: {}".format(data['error']))
         raise Ex.MediaNotAvailable
     Log(data)
-    if (Prefs['server'] == 'Openload') and (data['target']):
+    # setup ol streams
+    if (data['target']) and ('openload' in data['target'].lower()):
         vurls = list()
-        vurl = openload_stream(data['target'])
+        vurl = openload_stream(clean_url2(data['target']))
         q = 'Openload'
-    else:
+        host = q
+    # setup mc streams
+    elif (data['target']) and ('mycloud' in data['target'].lower()):
+        vurls = mycloud_streams(clean_url2(data['target']))
+        host = 'MyCloud'
+    # setup 9a streams
+    elif data['params']:
         grabber = clean_url(Network.AddParamsToURL(data['grabber'], data['params']))
         # streams handler
         resp = Network.Request(grabber, http_headers)
@@ -123,7 +134,7 @@ def PlayVideo(url, res='720', **kwargs):
         Log.Debug("* 9anime Video Sources: {}".format(vurls))
 
     # Mark watched
-    if Prefs['login']:
+    if vurls and Prefs['login']:
         values = {
             'username': Prefs['username'],
             'password': Prefs['password'],
@@ -160,7 +171,10 @@ def PlayVideo(url, res='720', **kwargs):
             elif s['label'] > int(res):
                 break
 
-    if vurl:
+    if vurl and (host == 'MyCloud'):
+        Log.Debug('* PlayDirect URL = {} | {}'.format(q, vurl))
+        return IndirectResponse(VideoClipObject, key=HTTPLiveStreamURL(Callback(PlayDirect, url=vurl)))
+    elif vurl and (host != 'MyCloud'):
         Log.Debug('* PlayVideo URL = {} | {}'.format(q, vurl))
         return IndirectResponse(VideoClipObject, key=vurl)
 
@@ -168,7 +182,7 @@ def PlayVideo(url, res='720', **kwargs):
 
 ####################################################################################################
 def openload_stream(url):
-    Log("* Find Openload Stream from '{}'".format(url))
+    Log("* Finding Openload Stream from '{}'".format(url))
     headers = {'User-Agent': Common.USER_AGENT, 'Referer': url}
     ourl = OpenloadStreamFromURL(url, headers)
     if not ourl:
@@ -185,6 +199,33 @@ def openload_stream(url):
         elif 'location' in e.headers:
             vurl = e.headers['location']
     return vurl
+
+####################################################################################################
+def mycloud_streams(url):
+    Log("* Finding MyCloud Stream(s) from '{}'".format(url))
+    vurls = list()
+    r = RE_HLS.search(HTTP.Request(url, cacheTime=10).content)
+    if not r:
+        Log.Warn("* Failed to find MyCloud Streams")
+        return vurls
+
+    hls_url = clean_url2(r.group(1))
+    page = HTTP.Request(hls_url, cacheTime=10).content
+    page = RE_SUB1.sub(hls_url.rsplit('/', 1)[0]+r'/\1', page)
+    for (u, r) in RE_SOURCES.findall(page):
+        vurls.append({'file': u, 'label': int(r)})
+    return vurls
+
+####################################################################################################
+def PlayDirect(url, **kwargs):
+    page = HTTP.Request(url, cacheTime=10).content
+    return RE_SUB1.sub(url.rsplit('/', 1)[0]+r'/\1', page)
+
+####################################################################################################
+def clean_url2(url):
+    if url.startswith('//'):
+        url = 'http:' + url
+    return url
 
 ####################################################################################################
 def clean_url(url):

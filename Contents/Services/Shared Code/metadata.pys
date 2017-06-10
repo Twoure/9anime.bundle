@@ -140,6 +140,8 @@ class Metadata(object):
             return int(self.re_serv.search(name).group(1))
         elif 'openload' in name.lower().strip():
             return (0)
+        elif 'mycloud' in name.lower().strip():
+            return (-2)
         return (-1)
 
     def seasons(self, server=1):
@@ -235,6 +237,8 @@ class Metadata(object):
         for (j, ser) in [(s['list_index'], s['server_number']) for s in Util.ListSortedByKey(self.server_list, 'list_index')]:
             if (self.i_for_name(Prefs['server']) == 0) and (ser == 0):
                 return (0)
+            if (self.i_for_name(Prefs['server']) == -2) and (ser == -2):
+                return (-2)
             elif (self.i_for_name(Prefs['server'][1:]) == j+1):
                 return ser
         return (-1)
